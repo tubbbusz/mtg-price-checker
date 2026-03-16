@@ -6,7 +6,7 @@ def load_ck_prices() -> dict:
     try:
         r = requests.get(
             "https://api.cardkingdom.com/api/v2/pricelist",
-            headers={"User-Agent": "MTGPriceChecker/1.0 (contact: kadenschaedel@gmail.com)"},
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
             timeout=30,
         )
         r.raise_for_status()
