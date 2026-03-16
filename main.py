@@ -183,10 +183,10 @@ async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False,
             data = r.json()
             cards = []
             for card in data.get("cards", []):
-                categories = [c.get("name", "").lower() for c in card.get("categories", [])]
-                if "sideboard" in categories and not include_sideboard:
-                    continue
+                categories = [c.lower() for c in card.get("categories", [])]
                 if "maybeboard" in categories and not include_maybeboard:
+                    continue
+                if "sideboard" in categories and not include_sideboard:
                     continue
                 name = card.get("card", {}).get("oracleCard", {}).get("name", "")
                 qty = card.get("quantity", 1)
