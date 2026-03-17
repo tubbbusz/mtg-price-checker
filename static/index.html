@@ -339,6 +339,7 @@
   col.col-cheapest { width: 82px; }
   col.col-ck { width: 60px; }
 
+
   #ctx-menu {
     position: fixed;
     background: #c0c0c0;
@@ -408,6 +409,7 @@
 <div id="titlebar">
   <div id="titlebar-left">&#9830; MTG Price Checker v1.0</div>
   <div id="ck-badge">CK Loading...</div>
+
 </div>
 
 <div id="menubar">
@@ -695,12 +697,15 @@ function buildTableHeaders() {
 
 async function pollCKStatus() {
   const badge = document.getElementById('ck-badge');
+  if (!badge) return;
   const check = async () => {
     try {
       const r = await fetch('/ck-status');
       const d = await r.json();
-      if (d.ready) { badge.textContent = `CK: ${d.count.toLocaleString()} cards`; badge.classList.add('ready'); }
-      else { badge.textContent = 'CK Loading...'; setTimeout(check, 2000); }
+      if (d.ready) {
+        badge.textContent = d.count > 0 ? `CK: ${d.count.toLocaleString()} cards` : 'CK: unavailable';
+        badge.classList.toggle('ready', d.count > 0);
+      } else { badge.textContent = 'CK Loading...'; setTimeout(check, 2000); }
     } catch { setTimeout(check, 3000); }
   };
   check();
@@ -806,6 +811,8 @@ function renderRowCells(tr, data) {
   if (data.ck_ratio != null) { tdCK.textContent = `${Math.round(data.ck_ratio * 100)}%`; }
   else { tdCK.textContent = '-'; tdCK.style.color = '#808080'; }
   tr.appendChild(tdCK);
+
+
 }
 
 function applyRowColour(tr, ratio) {
@@ -833,7 +840,7 @@ function recalcCheapest() {
     });
     if (cheapest === Infinity) cheapest = 0;
     data.cheapest_price = cheapest; data.cheapest_url = cheapUrl;
-    data.ck_ratio = (data.ck_usd && cheapest > 0) ? data.ck_usd / cheapest : null;
+
     const tr = document.querySelector(`#tbody tr[data-idx="${i}"]`);
     if (tr) { renderRowCells(tr, data); applyRowColour(tr, data.ck_ratio); }
     total += cheapest;
@@ -927,6 +934,7 @@ function sortBy(col) {
     let va, vb;
     if (col === 'Card') { va = a.card; vb = b.card; }
     else if (col === 'Cheapest') { va = a.cheapest_price||0; vb = b.cheapest_price||0; }
+
     else if (col === 'CK%') { va = a.ck_ratio||0; vb = b.ck_ratio||0; }
     else { va = a.results?.[col]?.price||0; vb = b.results?.[col]?.price||0; }
     if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
