@@ -787,8 +787,11 @@ document.addEventListener('click', hideCtx);
 
 // ── Open All ─────────────────────────────────────────────
 document.getElementById('btn-open-all').addEventListener('click', () => {
-  let n = 0; rows.forEach(r => { if (r.cheapest_url) { window.open(r.cheapest_url,'_blank'); n++; } });
-  toast(`Opened ${n} tabs`);
+  const urls = rows.map(r => r.cheapest_url).filter(Boolean);
+  if (!urls.length) { toast('No results yet'); return; }
+  // Stagger opens by 150ms each to avoid browser popup blocker
+  urls.forEach((url, i) => setTimeout(() => window.open(url, '_blank'), i * 150));
+  toast(`Opening ${urls.length} tabs...`);
 });
 
 // ── Export CSV ───────────────────────────────────────────

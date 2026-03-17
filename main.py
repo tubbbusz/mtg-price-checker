@@ -167,11 +167,43 @@ async def search_stream(req: SearchRequest):
 
 @app.get("/fetch-deck")
 async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False, include_maybeboard: bool = False):
-    """Parse a decklist from a URL using mtg_parser."""
+    import re
+    import requests as req_lib
+
+    archidekt_match = re.search(r"archidekt\.com/decks/(\d+)", url)
+    if archidekt_match:
+        deck_id = archidekt_match.group(1)
+        try:
+            loop = asyncio.get_event_loop()
+            def _fetch():
+                r = req_lib.get(
+                    f"https://archidekt.com/api/decks/{deck_id}/",
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=15,
+                )
+                r.raise_for_status()
+                return r.json()
+            data = await loop.run_in_executor(None, _fetch)
+            cards = []
+            for card in data.get("cards", []):
+                categories = [c.lower() for c in card.get("categories", [])]
+                if "maybeboard" in categories and not include_maybeboard:
+                    continue
+                if "sideboard" in categories and not include_sideboard:
+                    continue
+                name = card.get("card", {}).get("oracleCard", {}).get("name", "")
+                qty = card.get("quantity", 1)
+                if name:
+                    cards.append({"qty": qty, "name": name})
+            return {"cards": cards}
+        except Exception as e:
+            return {"error": str(e)}
+
     try:
         import mtg_parser
         loop = asyncio.get_event_loop()
-        cards = await loop.run_in_executor(None, lambda: list(mtg_parser.parse_deck(url)))
+        session = req_lib.Session()
+        cards = await loop.run_in_executor(None, lambda: list(mtg_parser.parse_deck(url, session)))
         filtered = []
         for c in cards:
             if "sideboard" in c.tags and not include_sideboard:
