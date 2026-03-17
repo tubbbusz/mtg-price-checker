@@ -5,7 +5,6 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
-from unittest import result
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -154,11 +153,11 @@ async def search_stream(req: SearchRequest):
 
         for i, card in enumerate(req.cards, 1):
             result = await loop.run_in_executor(
-        None, fetch_card, card, req.enabled_sources, req.hareruya_lang
+                None, fetch_card, card, req.enabled_sources, req.hareruya_lang
             )
             payload = {"type": "result", "index": i, **result}
             yield f"data: {json.dumps(payload)}\n\n"
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)  # rate limit: 5s between cards to avoid blocks
 
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
@@ -168,47 +167,22 @@ async def search_stream(req: SearchRequest):
 
 @app.get("/fetch-deck")
 async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False, include_maybeboard: bool = False):
-    import re, requests
-
-    # Archidekt — use their public API directly
-    archidekt_match = re.search(r"archidekt\.com/decks/(\d+)", url)
-    if archidekt_match:
-        deck_id = archidekt_match.group(1)
-        try:
-            r = requests.get(
-                f"https://archidekt.com/api/decks/{deck_id}/",
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=15
-            )
-            r.raise_for_status()
-            data = r.json()
-            cards = []
-            for card in data.get("cards", []):
-                categories = [c.lower() for c in card.get("categories", [])]
-                if "maybeboard" in categories and not include_maybeboard:
-                    continue
-                if "sideboard" in categories and not include_sideboard:
-                    continue
-                name = card.get("card", {}).get("oracleCard", {}).get("name", "")
-                qty = card.get("quantity", 1)
-                if name:
-                    cards.append({"qty": qty, "name": name})
-            return {"cards": cards}
-        except Exception as e:
-            return {"error": str(e)}
-
-    # Fallback — mtg_parser for other sites
+    """Parse a decklist from a URL using mtg_parser."""
     try:
-        import mtg_parser, requests
+        import mtg_parser
         loop = asyncio.get_event_loop()
-        session = requests.Session()
-        cards = await loop.run_in_executor(None, lambda: list(mtg_parser.parse_deck(url, session)))
-        filtered = [{"qty": c.quantity, "name": c.name} for c in cards
-                    if not ("sideboard" in c.tags and not include_sideboard)
-                    and not ("maybeboard" in c.tags and not include_maybeboard)]
+        cards = await loop.run_in_executor(None, lambda: list(mtg_parser.parse_deck(url)))
+        filtered = []
+        for c in cards:
+            if "sideboard" in c.tags and not include_sideboard:
+                continue
+            if "maybeboard" in c.tags and not include_maybeboard:
+                continue
+            filtered.append({"qty": c.quantity, "name": c.name})
         return {"cards": filtered}
     except Exception as e:
         return {"error": str(e)}
+
 
 @app.get("/ck-status")
 def ck_status():

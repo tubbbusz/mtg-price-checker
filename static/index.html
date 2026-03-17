@@ -1,8 +1,8 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<!-- saved from url=(0045)file:///C:/Users/kaden/Downloads/index_1.html -->
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MTG Price Checker v1.0</title>
 <style>
   body {
@@ -14,7 +14,6 @@
     padding: 0;
   }
 
-  /* ── Title bar ── */
   #titlebar {
     background: #000080;
     color: #ffffff;
@@ -36,18 +35,16 @@
   }
   #ck-badge.ready { color: #00ff00; border-color: #00ff00; }
 
-  /* ── Menu bar ── */
   #menubar {
     background: #c0c0c0;
     border-bottom: 1px solid #808080;
-    padding: 2px 4px;
-    font-size: 12px;
     border-top: 2px solid #ffffff;
     border-left: 2px solid #ffffff;
     border-right: 2px solid #808080;
+    padding: 2px 4px;
+    font-size: 12px;
   }
 
-  /* ── Win95 raised/sunken ── */
   .raised {
     border-top: 2px solid #ffffff;
     border-left: 2px solid #ffffff;
@@ -61,7 +58,6 @@
     border-bottom: 2px solid #ffffff;
   }
 
-  /* ── Layout ── */
   #main-layout {
     display: flex;
     gap: 4px;
@@ -70,17 +66,15 @@
     box-sizing: border-box;
   }
 
-  /* ── Sidebar ── */
   #sidebar {
-    width: 220px;
-    min-width: 220px;
+    width: 230px;
+    min-width: 230px;
     display: flex;
     flex-direction: column;
     gap: 4px;
     overflow-y: auto;
   }
 
-  /* ── Groupboxes ── */
   .groupbox {
     background: #c0c0c0;
     padding: 4px;
@@ -100,7 +94,6 @@
     letter-spacing: 0.5px;
   }
 
-  /* ── Inputs ── */
   input[type="text"], textarea, select {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 11px;
@@ -118,13 +111,12 @@
   textarea {
     width: 100%;
     resize: vertical;
-    min-height: 120px;
+    min-height: 200px;
     font-family: "Courier New", monospace;
     font-size: 11px;
   }
   select { padding: 1px 2px; }
 
-  /* ── Buttons ── */
   .btn {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 11px;
@@ -154,7 +146,10 @@
   .url-row { display: flex; gap: 3px; margin-bottom: 4px; align-items: center; }
   .url-row input { flex: 1; min-width: 0; width: auto; }
 
-  /* ── Settings ── */
+  /* Saved decks row */
+  .saved-row { display: flex; gap: 3px; margin-bottom: 4px; align-items: center; }
+  .saved-row select { flex: 1; min-width: 0; width: auto; font-size: 11px; }
+
   .setting-row {
     display: flex;
     align-items: center;
@@ -165,7 +160,6 @@
   }
   .setting-row:last-child { border-bottom: none; }
 
-  /* ── Source toggles ── */
   .source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
   .source-toggle {
     display: flex;
@@ -184,12 +178,12 @@
     float: right;
   }
 
-  /* ── Missing list ── */
+  /* Missing list — fixed height, no resize */
   #missing-list {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 100px;
+    height: 80px;
     overflow-y: auto;
     font-size: 11px;
     background: #ffffff;
@@ -200,10 +194,8 @@
   }
   #missing-list li { padding: 1px 4px; border-bottom: 1px dotted #c0c0c0; color: #800000; }
 
-  /* ── Content ── */
   #content { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
-  /* ── Status bar ── */
   #statusbar {
     background: #c0c0c0;
     display: flex;
@@ -243,7 +235,6 @@
     background: #c0c0c0;
   }
 
-  /* ── Table ── */
   #table-wrap {
     flex: 1;
     overflow: auto;
@@ -288,7 +279,6 @@
   col.col-cheapest { width: 82px; }
   col.col-ck { width: 60px; }
 
-  /* ── Context menu ── */
   #ctx-menu {
     position: fixed;
     background: #c0c0c0;
@@ -308,13 +298,10 @@
   #ctx-menu li.divider {
     border-top: 1px solid #808080;
     border-bottom: 1px solid #ffffff;
-    margin: 2px 0;
-    padding: 0;
-    cursor: default;
+    margin: 2px 0; padding: 0; cursor: default;
   }
   #ctx-menu li.divider:hover { background: transparent; color: #000000; }
 
-  /* ── Toast ── */
   #toast {
     position: fixed;
     bottom: 20px;
@@ -332,7 +319,6 @@
   }
   #toast.show { opacity: 1; }
 
-  /* ── Win95 scrollbars ── */
   ::-webkit-scrollbar { width: 16px; height: 16px; }
   ::-webkit-scrollbar-track { background: #c0c0c0; }
   ::-webkit-scrollbar-thumb {
@@ -348,9 +334,7 @@
     border-left: 2px solid #ffffff;
     border-right: 2px solid #808080;
     border-bottom: 2px solid #808080;
-    display: block;
-    height: 16px;
-    width: 16px;
+    display: block; height: 16px; width: 16px;
   }
   ::-webkit-scrollbar-corner { background: #c0c0c0; }
 
@@ -362,7 +346,7 @@
 <body>
 
 <div id="titlebar">
-  <div id="titlebar-left">♦ MTG Price Checker v1.0</div>
+  <div id="titlebar-left">&#9830; MTG Price Checker v1.0</div>
   <div id="ck-badge">CK Loading...</div>
 </div>
 
@@ -377,20 +361,29 @@
 
   <div id="sidebar">
 
+    <!-- Deck Input -->
     <div class="groupbox">
-      <div class="groupbox-title">📄 Deck Input</div>
+      <div class="groupbox-title">Deck Input</div>
+
+      <!-- URL fetch row -->
       <div class="url-row">
-        <input type="text" id="url-input" placeholder="Paste deck URL...">
+        <input type="text" id="url-input" placeholder="Paste deck URL..." />
         <button class="btn" id="btn-fetch-url">Fetch</button>
       </div>
-      <textarea id="deck-input" placeholder="Paste decklist here...
 
-e.g.
-4 Lightning Bolt
-2 Counterspell"></textarea>
+      <!-- Saved decks row -->
+      <div class="saved-row">
+        <select id="saved-decks-dropdown">
+          <option value="">-- Saved Decks --</option>
+        </select>
+        <button class="btn" id="btn-save-deck">Save</button>
+        <button class="btn" id="btn-delete-deck">Del</button>
+      </div>
+
+      <textarea id="deck-input" placeholder="Paste decklist here...&#10;&#10;e.g.&#10;4 Lightning Bolt&#10;2 Counterspell"></textarea>
       <div class="btn-row">
-        <button class="btn btn-primary" id="btn-search" style="flex:1">► Search Prices</button>
-        <button class="btn btn-danger" id="btn-stop" style="display:none">■ Stop</button>
+        <button class="btn btn-primary" id="btn-search" style="flex:1">&#9658; Search Prices</button>
+        <button class="btn btn-danger" id="btn-stop" style="display:none">&#9632; Stop</button>
       </div>
       <div class="btn-row">
         <button class="btn" id="btn-open-all">Open All Cheapest</button>
@@ -398,13 +391,14 @@ e.g.
       </div>
     </div>
 
+    <!-- Settings -->
     <div class="groupbox">
-      <div class="groupbox-title">⚙ Settings</div>
+      <div class="groupbox-title">Settings</div>
       <div class="setting-row">
         <label for="hareruya-lang">Hareruya Language:</label>
         <select id="hareruya-lang">
           <option value="EN">EN</option>
-          <option value="EN&gt;JP">EN&gt;JP</option>
+          <option value="EN>JP">EN&gt;JP</option>
           <option value="JP">JP</option>
           <option value="Other">Other</option>
           <option value="All">All</option>
@@ -412,24 +406,26 @@ e.g.
       </div>
       <div class="setting-row">
         <label for="cb-sideboard">Include Sideboard</label>
-        <input type="checkbox" id="cb-sideboard">
+        <input type="checkbox" id="cb-sideboard" />
       </div>
       <div class="setting-row">
         <label for="cb-maybeboard">Include Maybeboard</label>
-        <input type="checkbox" id="cb-maybeboard">
+        <input type="checkbox" id="cb-maybeboard" />
       </div>
     </div>
 
+    <!-- Sources -->
     <div class="groupbox">
       <div class="groupbox-title">
-        ☰ Sources
+        Sources
         <span class="toggle-all-link" id="toggle-all-sources">[toggle all]</span>
       </div>
       <div class="source-grid" id="source-grid"></div>
     </div>
 
+    <!-- Missing Cards -->
     <div class="groupbox">
-      <div class="groupbox-title">⚠ Missing / Out of Stock</div>
+      <div class="groupbox-title">Missing / Out of Stock</div>
       <ul id="missing-list"></ul>
     </div>
 
@@ -443,7 +439,7 @@ e.g.
         <span id="status-text">Ready -- paste a decklist and click Search Prices</span>
       </div>
       <div id="total-label">AU $0.00</div>
-      <button class="btn btn-primary" onclick="document.getElementById(&#39;btn-open-all&#39;).click()">Open All Cheapest</button>
+      <button class="btn btn-primary" onclick="document.getElementById('btn-open-all').click()">Open All Cheapest</button>
     </div>
 
     <div id="table-wrap">
@@ -462,6 +458,7 @@ e.g.
 <div id="toast"></div>
 
 <script>
+// ── State ────────────────────────────────────────────────
 let SOURCES = [];
 let enabledSources = new Set();
 let rows = [];
@@ -471,6 +468,84 @@ let selectedIdx = null;
 let abortCtrl = null;
 let lastClickIdx = null;
 
+// ── Saved decks (localStorage) ───────────────────────────
+const STORAGE_KEY = 'mtg_saved_decks';
+
+function loadSavedDecks() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+  catch { return {}; }
+}
+
+function saveDeckStorage(decks) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
+}
+
+function refreshDeckDropdown() {
+  const sel = document.getElementById('saved-decks-dropdown');
+  const decks = loadSavedDecks();
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- Saved Decks --</option>';
+  Object.keys(decks).sort().forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  if (current && decks[current]) sel.value = current;
+}
+
+document.getElementById('btn-save-deck').addEventListener('click', () => {
+  const url = document.getElementById('url-input').value.trim();
+  const decklist = document.getElementById('deck-input').value.trim();
+  if (!url && !decklist) { toast('Nothing to save'); return; }
+
+  // Generate a name from URL or prompt
+  let name = '';
+  if (url) {
+    // Try to extract a readable name from common deck URL formats
+    const m = url.match(/\/decks\/\d+\/([^/?#]+)/) || url.match(/\/deck\/([^/?#]+)/);
+    if (m) name = m[1].replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+  if (!name) name = `Deck ${Object.keys(loadSavedDecks()).length + 1}`;
+
+  const finalName = window.prompt('Save deck as:', name);
+  if (!finalName) return;
+
+  const decks = loadSavedDecks();
+  decks[finalName.trim()] = { url, decklist };
+  saveDeckStorage(decks);
+  refreshDeckDropdown();
+  document.getElementById('saved-decks-dropdown').value = finalName.trim();
+  toast(`Saved as "${finalName.trim()}"`);
+});
+
+document.getElementById('btn-delete-deck').addEventListener('click', () => {
+  const sel = document.getElementById('saved-decks-dropdown');
+  const name = sel.value;
+  if (!name) { toast('No deck selected'); return; }
+  if (!window.confirm(`Delete "${name}"?`)) return;
+  const decks = loadSavedDecks();
+  delete decks[name];
+  saveDeckStorage(decks);
+  refreshDeckDropdown();
+  toast(`Deleted "${name}"`);
+});
+
+document.getElementById('saved-decks-dropdown').addEventListener('change', () => {
+  const sel = document.getElementById('saved-decks-dropdown');
+  const name = sel.value;
+  if (!name) return;
+  const decks = loadSavedDecks();
+  const deck = decks[name];
+  if (!deck) return;
+  if (deck.url) {
+    document.getElementById('url-input').value = deck.url;
+  }
+  if (deck.decklist) {
+    document.getElementById('deck-input').value = deck.decklist;
+  }
+});
+
+// ── Init ─────────────────────────────────────────────────
 async function init() {
   const res = await fetch('/sources');
   SOURCES = await res.json();
@@ -491,6 +566,7 @@ async function init() {
 
   buildTableHeaders();
   pollCKStatus();
+  refreshDeckDropdown();
 }
 
 function buildTableHeaders() {
@@ -522,6 +598,7 @@ async function pollCKStatus() {
   check();
 }
 
+// ── Search ───────────────────────────────────────────────
 document.getElementById('btn-search').addEventListener('click', startSearch);
 document.getElementById('btn-stop').addEventListener('click', stopSearch);
 
@@ -585,6 +662,7 @@ function handleSSE(msg) {
   }
 }
 
+// ── Table rendering ──────────────────────────────────────
 function appendRow(data) {
   const tr = document.createElement('tr');
   tr.dataset.idx = rows.length - 1;
@@ -668,6 +746,7 @@ function updateMissing() {
   });
 }
 
+// ── Row interaction ──────────────────────────────────────
 function onRowClick(e) {
   const idx = +e.currentTarget.dataset.idx;
   document.querySelectorAll('#tbody tr').forEach(r => r.classList.remove('selected'));
@@ -706,11 +785,13 @@ function showContextMenu(x, y, idx) {
 function hideCtx() { document.getElementById('ctx-menu').classList.remove('open'); }
 document.addEventListener('click', hideCtx);
 
+// ── Open All ─────────────────────────────────────────────
 document.getElementById('btn-open-all').addEventListener('click', () => {
   let n = 0; rows.forEach(r => { if (r.cheapest_url) { window.open(r.cheapest_url,'_blank'); n++; } });
   toast(`Opened ${n} tabs`);
 });
 
+// ── Export CSV ───────────────────────────────────────────
 document.getElementById('btn-export').addEventListener('click', () => {
   if (!rows.length) { toast('No data to export'); return; }
   const headers = ['Card', ...SOURCES, 'Cheapest (AUD)', 'CK USD', 'CK Ratio', 'Cheapest URL'];
@@ -721,11 +802,10 @@ document.getElementById('btn-export').addEventListener('click', () => {
   });
   const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `mtg_prices_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
+  a.href = URL.createObjectURL(blob); a.download = `mtg_prices_${new Date().toISOString().slice(0,10)}.csv`; a.click();
 });
 
+// ── Sort ─────────────────────────────────────────────────
 function sortBy(col) {
   if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = true; }
   document.querySelectorAll('thead th').forEach(th => {
@@ -750,6 +830,7 @@ function sortBy(col) {
   });
 }
 
+// ── Deck URL fetch ───────────────────────────────────────
 document.getElementById('btn-fetch-url').addEventListener('click', async () => {
   const url = document.getElementById('url-input').value.trim(); if (!url) return;
   setStatus('Fetching deck...');
@@ -764,6 +845,7 @@ document.getElementById('btn-fetch-url').addEventListener('click', async () => {
   } catch (e) { toast('Failed to fetch deck: ' + e.message); }
 });
 
+// ── Toggle all sources ───────────────────────────────────
 document.getElementById('toggle-all-sources').addEventListener('click', () => {
   const allOn = SOURCES.every(s => enabledSources.has(s));
   document.querySelectorAll('#source-grid input[type=checkbox]').forEach(cb => {
@@ -773,6 +855,7 @@ document.getElementById('toggle-all-sources').addEventListener('click', () => {
   recalcCheapest();
 });
 
+// ── Helpers ──────────────────────────────────────────────
 function parseDecklist(text) {
   return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => l.replace(/^\d+x?\s*/, '').trim()).filter(Boolean);
 }
@@ -785,6 +868,5 @@ function toast(msg) {
 
 init();
 </script>
-
-
-</body></html>
+</body>
+</html>
