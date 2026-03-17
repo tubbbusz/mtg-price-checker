@@ -1,465 +1,481 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>MTG Price Checker</title>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<!-- saved from url=(0045)file:///C:/Users/kaden/Downloads/index_1.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MTG Price Checker v1.0</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #1a1a2e;
-    --surface: #16213e;
-    --surface2: #0f3460;
-    --accent: #e94560;
-    --accent2: #533483;
-    --text: #eaeaea;
-    --text-muted: #9a9ab0;
-    --border: #2a2a4a;
-    --green: #4caf50;
-    --red: #f44336;
-    --row-alt: #1e1e38;
-    --row-hover: #252545;
-  }
-
   body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    background-color: #c0c0c0;
+    color: #000000;
+    margin: 0;
+    padding: 0;
   }
 
-  /* ── Header ─────────────────────────────────────────── */
-  header {
-    background: linear-gradient(135deg, var(--surface2), var(--accent2));
-    padding: 14px 24px;
+  /* ── Title bar ── */
+  #titlebar {
+    background: #000080;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 3px 6px;
     display: flex;
     align-items: center;
-    gap: 14px;
-    border-bottom: 2px solid var(--accent);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    justify-content: space-between;
+    user-select: none;
   }
-  header h1 {
-    font-size: 1.4rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+  #titlebar-left { display: flex; align-items: center; gap: 6px; }
+  #ck-badge {
+    font-size: 10px;
+    background: #000080;
+    color: #ffff00;
+    border: 1px solid #ffff00;
+    padding: 1px 6px;
   }
-  header h1 span { color: var(--accent); }
-  .ck-badge {
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    background: rgba(0,0,0,0.3);
-    padding: 4px 10px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-  }
-  .ck-badge.ready { color: var(--green); border-color: var(--green); }
+  #ck-badge.ready { color: #00ff00; border-color: #00ff00; }
 
-  /* ── Main layout ─────────────────────────────────────── */
-  main {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 0;
-    flex: 1;
-    overflow: hidden;
+  /* ── Menu bar ── */
+  #menubar {
+    background: #c0c0c0;
+    border-bottom: 1px solid #808080;
+    padding: 2px 4px;
+    font-size: 12px;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
   }
 
-  /* ── Sidebar ─────────────────────────────────────────── */
-  aside {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
+  /* ── Win95 raised/sunken ── */
+  .raised {
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+  }
+  .sunken {
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+  }
+
+  /* ── Layout ── */
+  #main-layout {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    height: calc(100vh - 52px);
+    box-sizing: border-box;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 220px;
+    min-width: 220px;
     display: flex;
     flex-direction: column;
+    gap: 4px;
     overflow-y: auto;
-    padding: 16px;
-    gap: 16px;
   }
 
-  .panel {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
+  /* ── Groupboxes ── */
+  .groupbox {
+    background: #c0c0c0;
+    padding: 4px;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
   }
-  .panel-header {
-    background: var(--surface2);
-    padding: 8px 12px;
-    font-size: 0.78rem;
-    font-weight: 600;
+  .groupbox-title {
+    background: #000080;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    margin-bottom: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-muted);
+    letter-spacing: 0.5px;
   }
-  .panel-body { padding: 12px; }
 
-  /* Deck input */
-  .url-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  /* ── Inputs ── */
   input[type="text"], textarea, select {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 7px 10px;
-    font-size: 0.85rem;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    background: #ffffff;
+    color: #000000;
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+    padding: 2px 3px;
     outline: none;
-    transition: border-color 0.2s;
+    box-sizing: border-box;
   }
-  input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--accent); }
-  input[type="text"] { flex: 1; min-width: 0; }
-  textarea { width: 100%; resize: vertical; min-height: 140px; font-family: monospace; font-size: 0.8rem; line-height: 1.5; }
+  input[type="text"] { width: 100%; }
+  textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 120px;
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+  }
+  select { padding: 1px 2px; }
 
+  /* ── Buttons ── */
   .btn {
-    padding: 7px 14px;
-    border: none;
-    border-radius: 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    background: #c0c0c0;
+    color: #000000;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    padding: 3px 10px;
     cursor: pointer;
-    font-size: 0.83rem;
-    font-weight: 600;
-    transition: opacity 0.2s, transform 0.1s;
     white-space: nowrap;
   }
-  .btn:active { transform: scale(0.97); }
-  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .btn-success { background: var(--green); color: #fff; }
-  .btn-danger { background: var(--red); color: #fff; }
-  .btn-sm { padding: 4px 10px; font-size: 0.77rem; }
+  .btn:active {
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+    padding: 4px 9px 2px 11px;
+  }
+  .btn:disabled { color: #808080; cursor: default; }
+  .btn-primary { background: #000080; color: #ffffff; font-weight: bold; }
+  .btn-primary:active { background: #000060; }
+  .btn-danger { background: #800000; color: #ffffff; }
 
-  .btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+  .url-row { display: flex; gap: 3px; margin-bottom: 4px; align-items: center; }
+  .url-row input { flex: 1; min-width: 0; width: auto; }
 
-  /* Settings */
+  /* ── Settings ── */
   .setting-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 5px 0;
-    font-size: 0.83rem;
-    border-bottom: 1px solid var(--border);
+    padding: 2px 0;
+    border-bottom: 1px solid #808080;
+    font-size: 11px;
   }
   .setting-row:last-child { border-bottom: none; }
-  label { cursor: pointer; user-select: none; }
 
-  select { padding: 5px 8px; }
-
-  /* Source toggles */
-  .source-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-  }
+  /* ── Source toggles ── */
+  .source-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
   .source-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 8px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    background: var(--surface2);
-    border: 1px solid var(--border);
+    gap: 3px;
+    font-size: 11px;
+    padding: 1px 2px;
     cursor: pointer;
-    transition: background 0.15s;
   }
-  .source-toggle:hover { background: var(--accent2); }
-  .source-toggle input[type=checkbox] { accent-color: var(--accent); }
+  .source-toggle:hover { background: #000080; color: #ffffff; }
+  .toggle-all-link {
+    font-size: 10px;
+    color: #0000ff;
+    cursor: pointer;
+    text-decoration: underline;
+    float: right;
+  }
 
-  /* Missing cards */
+  /* ── Missing list ── */
   #missing-list {
     list-style: none;
-    max-height: 120px;
+    padding: 0;
+    margin: 0;
+    max-height: 100px;
     overflow-y: auto;
-    font-size: 0.8rem;
-    color: var(--red);
+    font-size: 11px;
+    background: #ffffff;
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
   }
-  #missing-list li { padding: 3px 4px; border-bottom: 1px solid var(--border); }
-  #missing-list li:last-child { border-bottom: none; }
+  #missing-list li { padding: 1px 4px; border-bottom: 1px dotted #c0c0c0; color: #800000; }
 
-  /* ── Content area ────────────────────────────────────── */
-  .content {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+  /* ── Content ── */
+  #content { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
-  /* Status bar */
-  .statusbar {
+  /* ── Status bar ── */
+  #statusbar {
+    background: #c0c0c0;
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 8px 16px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    font-size: 0.82rem;
+    gap: 6px;
+    padding: 2px 4px;
+    font-size: 11px;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
   }
-  .progress-wrap { flex: 1; }
+  #statusbar-left { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  #status-text { color: #000000; font-size: 11px; }
   progress {
     width: 100%;
-    height: 6px;
-    border-radius: 3px;
+    height: 14px;
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
     appearance: none;
-    overflow: hidden;
-    background: var(--border);
+    background: #ffffff;
   }
-  progress::-webkit-progress-bar { background: var(--border); border-radius: 3px; }
-  progress::-webkit-progress-value { background: var(--accent); border-radius: 3px; }
-  #status-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
-  .total-chip {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--green);
-    background: rgba(76,175,80,0.12);
-    border: 1px solid var(--green);
-    padding: 4px 14px;
-    border-radius: 20px;
+  progress::-webkit-progress-bar { background: #ffffff; }
+  progress::-webkit-progress-value { background: #000080; }
+  #total-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #000080;
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+    padding: 2px 8px;
+    white-space: nowrap;
+    background: #c0c0c0;
   }
 
-  /* Table */
-  .table-wrap {
+  /* ── Table ── */
+  #table-wrap {
     flex: 1;
     overflow: auto;
-    position: relative;
+    background: #ffffff;
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
   }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.82rem;
-    table-layout: fixed;
-  }
-  thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+  thead { position: sticky; top: 0; z-index: 10; }
   thead th {
-    background: var(--surface2);
-    padding: 9px 8px;
+    background: #000080;
+    color: #ffffff;
+    padding: 3px 6px;
     text-align: left;
     white-space: nowrap;
     cursor: pointer;
-    border-bottom: 2px solid var(--accent);
-    font-weight: 600;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    border-right: 1px solid #4040a0;
+    font-size: 11px;
+    font-weight: bold;
     user-select: none;
   }
-  thead th:hover { background: var(--accent2); }
-  thead th.sorted-asc::after { content: ' ▲'; font-size: 0.65rem; }
-  thead th.sorted-desc::after { content: ' ▼'; font-size: 0.65rem; }
+  thead th:hover { background: #0000b0; }
+  thead th.sorted-asc::after { content: ' /\\'; font-size: 9px; }
+  thead th.sorted-desc::after { content: ' \\/'; font-size: 9px; }
 
-  tbody tr {
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.1s;
-  }
-  tbody tr:nth-child(even) { background: var(--row-alt); }
-  tbody tr:hover { background: var(--row-hover); }
-  tbody tr.selected { background: #2a2a5a !important; outline: 1px solid var(--accent); }
+  tbody tr { border-bottom: 1px solid #e0e0e0; cursor: pointer; }
+  tbody tr:nth-child(even) { background: #f0f0f0; }
+  tbody tr:hover { background: #000080 !important; color: #ffffff !important; }
+  tbody tr.selected { background: #000080 !important; color: #ffffff !important; outline: 1px dotted #ffffff; }
+  tbody tr:hover td, tbody tr.selected td { color: #ffffff !important; font-weight: normal !important; }
 
-  td {
-    padding: 7px 8px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 0;
-  }
-  td.card-name { font-weight: 500; color: #c8d8ff; }
-  td.price { text-align: right; font-variant-numeric: tabular-nums; font-family: monospace; font-size: 0.83rem; }
-  td.cheapest { color: var(--green); font-weight: 700; text-align: right; }
+  td { padding: 2px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; font-size: 11px; }
+  td.card-name { font-weight: bold; color: #000080; }
+  td.price { text-align: right; font-family: "Courier New", monospace; }
+  td.cheapest { text-align: right; font-weight: bold; color: #006600; font-family: "Courier New", monospace; }
   td.ck-col { text-align: center; }
-  td.missing { color: var(--text-muted); font-size: 0.75rem; }
 
-  /* CK% colour coding via inline style */
+  col.col-card { width: 160px; }
+  col.col-price { width: 82px; }
+  col.col-cheapest { width: 82px; }
+  col.col-ck { width: 60px; }
 
-  /* Column widths */
-  col.col-card { width: 170px; }
-  col.col-price { width: 88px; }
-  col.col-cheapest { width: 90px; }
-  col.col-ck { width: 70px; }
-
-  /* Loading skeleton row */
-  .skeleton td { animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
-
-  /* Context menu */
+  /* ── Context menu ── */
   #ctx-menu {
     position: fixed;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    background: #c0c0c0;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    box-shadow: 2px 2px 0 #000000;
     z-index: 1000;
     min-width: 180px;
     display: none;
   }
   #ctx-menu.open { display: block; }
-  #ctx-menu ul { list-style: none; padding: 4px 0; }
-  #ctx-menu li {
-    padding: 8px 14px;
-    font-size: 0.83rem;
-    cursor: pointer;
-    transition: background 0.1s;
+  #ctx-menu ul { list-style: none; padding: 2px 0; margin: 0; }
+  #ctx-menu li { padding: 4px 20px; font-size: 11px; cursor: pointer; }
+  #ctx-menu li:hover { background: #000080; color: #ffffff; }
+  #ctx-menu li.divider {
+    border-top: 1px solid #808080;
+    border-bottom: 1px solid #ffffff;
+    margin: 2px 0;
+    padding: 0;
+    cursor: default;
   }
-  #ctx-menu li:hover { background: var(--accent2); }
-  #ctx-menu li.divider { border-top: 1px solid var(--border); margin: 3px 0; padding: 0; }
+  #ctx-menu li.divider:hover { background: transparent; color: #000000; }
 
-  /* Toast */
+  /* ── Toast ── */
   #toast {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: var(--surface2);
-    border: 1px solid var(--accent);
-    color: var(--text);
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    bottom: 20px;
+    right: 20px;
+    background: #ffffe1;
+    color: #000000;
+    border: 1px solid #000000;
+    box-shadow: 2px 2px 0 #808080;
+    padding: 4px 10px;
+    font-size: 11px;
     z-index: 2000;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.2s;
     pointer-events: none;
   }
   #toast.show { opacity: 1; }
 
-  /* Scrollbar styling */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
+  /* ── Win95 scrollbars ── */
+  ::-webkit-scrollbar { width: 16px; height: 16px; }
+  ::-webkit-scrollbar-track { background: #c0c0c0; }
+  ::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+  }
+  ::-webkit-scrollbar-button {
+    background: #c0c0c0;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    display: block;
+    height: 16px;
+    width: 16px;
+  }
+  ::-webkit-scrollbar-corner { background: #c0c0c0; }
+
+  input[type="checkbox"] { cursor: pointer; }
+  label { cursor: pointer; }
+  a { color: #0000ff; }
 </style>
 </head>
 <body>
 
-<header>
-  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-    <circle cx="14" cy="14" r="13" stroke="#e94560" stroke-width="2"/>
-    <path d="M9 20 L14 8 L19 20 M11 16 H17" stroke="#eaeaea" stroke-width="1.8" stroke-linecap="round"/>
-  </svg>
-  <h1>MTG <span>Price</span> Checker</h1>
-  <div id="ck-badge" class="ck-badge">CK Loading…</div>
-</header>
+<div id="titlebar">
+  <div id="titlebar-left">♦ MTG Price Checker v1.0</div>
+  <div id="ck-badge">CK Loading...</div>
+</div>
 
-<main>
-  <!-- ── Sidebar ───────────────────────────────── -->
-  <aside>
+<div id="menubar">
+  <b><u>F</u>ile</b> &nbsp;|&nbsp;
+  <b><u>E</u>dit</b> &nbsp;|&nbsp;
+  <b><u>V</u>iew</b> &nbsp;|&nbsp;
+  <b><u>H</u>elp</b>
+</div>
 
-    <!-- Deck Input -->
-    <div class="panel">
-      <div class="panel-header">Deck Input</div>
-      <div class="panel-body">
-        <div class="url-row">
-          <input type="text" id="url-input" placeholder="Paste deck URL…" />
-          <button class="btn btn-secondary btn-sm" id="btn-fetch-url">Fetch</button>
-        </div>
-        <textarea id="deck-input" placeholder="Or paste your decklist here&#10;&#10;e.g.&#10;4 Lightning Bolt&#10;2 Counterspell"></textarea>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="btn-search" style="flex:1">▶ Search Prices</button>
-          <button class="btn btn-danger btn-sm" id="btn-stop" style="display:none">■ Stop</button>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-secondary btn-sm" id="btn-open-all">⬡ Open All Cheapest</button>
-          <button class="btn btn-success btn-sm" id="btn-export">⬇ Export CSV</button>
-        </div>
+<div id="main-layout">
+
+  <div id="sidebar">
+
+    <div class="groupbox">
+      <div class="groupbox-title">📄 Deck Input</div>
+      <div class="url-row">
+        <input type="text" id="url-input" placeholder="Paste deck URL...">
+        <button class="btn" id="btn-fetch-url">Fetch</button>
+      </div>
+      <textarea id="deck-input" placeholder="Paste decklist here...
+
+e.g.
+4 Lightning Bolt
+2 Counterspell"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-search" style="flex:1">► Search Prices</button>
+        <button class="btn btn-danger" id="btn-stop" style="display:none">■ Stop</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btn-open-all">Open All Cheapest</button>
+        <button class="btn" id="btn-export">Export CSV</button>
       </div>
     </div>
 
-    <!-- Settings -->
-    <div class="panel">
-      <div class="panel-header">Settings</div>
-      <div class="panel-body">
-        <div class="setting-row">
-          <label for="hareruya-lang">Hareruya Language</label>
-          <select id="hareruya-lang">
-            <option value="EN">EN</option>
-            <option value="EN>JP">EN→JP</option>
-            <option value="JP">JP</option>
-            <option value="Other">Other</option>
-            <option value="All">All</option>
-          </select>
-        </div>
-        <div class="setting-row">
-          <label for="cb-sideboard">Include Sideboard</label>
-          <input type="checkbox" id="cb-sideboard" />
-        </div>
-        <div class="setting-row">
-          <label for="cb-maybeboard">Include Maybeboard</label>
-          <input type="checkbox" id="cb-maybeboard" />
-        </div>
+    <div class="groupbox">
+      <div class="groupbox-title">⚙ Settings</div>
+      <div class="setting-row">
+        <label for="hareruya-lang">Hareruya Language:</label>
+        <select id="hareruya-lang">
+          <option value="EN">EN</option>
+          <option value="EN&gt;JP">EN&gt;JP</option>
+          <option value="JP">JP</option>
+          <option value="Other">Other</option>
+          <option value="All">All</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label for="cb-sideboard">Include Sideboard</label>
+        <input type="checkbox" id="cb-sideboard">
+      </div>
+      <div class="setting-row">
+        <label for="cb-maybeboard">Include Maybeboard</label>
+        <input type="checkbox" id="cb-maybeboard">
       </div>
     </div>
 
-    <!-- Source Toggles -->
-    <div class="panel">
-      <div class="panel-header">Sources
-        <span style="float:right;font-weight:400;cursor:pointer;font-size:0.75rem" id="toggle-all-sources">Toggle All</span>
+    <div class="groupbox">
+      <div class="groupbox-title">
+        ☰ Sources
+        <span class="toggle-all-link" id="toggle-all-sources">[toggle all]</span>
       </div>
-      <div class="panel-body">
-        <div class="source-grid" id="source-grid">
-          <!-- Populated by JS -->
-        </div>
-      </div>
+      <div class="source-grid" id="source-grid"></div>
     </div>
 
-    <!-- Missing Cards -->
-    <div class="panel">
-      <div class="panel-header">Missing / Out of Stock</div>
-      <div class="panel-body" style="padding:8px">
-        <ul id="missing-list"></ul>
-      </div>
+    <div class="groupbox">
+      <div class="groupbox-title">⚠ Missing / Out of Stock</div>
+      <ul id="missing-list"></ul>
     </div>
 
-  </aside>
+  </div>
 
-  <!-- ── Content ───────────────────────────────── -->
-  <div class="content">
-    <div class="statusbar">
-      <div class="progress-wrap">
+  <div id="content">
+
+    <div id="statusbar">
+      <div id="statusbar-left">
         <progress id="progress-bar" value="0" max="100"></progress>
-        <div id="status-text">Ready — paste a decklist and click Search</div>
+        <span id="status-text">Ready -- paste a decklist and click Search Prices</span>
       </div>
-      <div class="total-chip" id="total-label">AU $0.00</div>
+      <div id="total-label">AU $0.00</div>
+      <button class="btn btn-primary" onclick="document.getElementById(&#39;btn-open-all&#39;).click()">Open All Cheapest</button>
     </div>
 
-    <div class="table-wrap">
+    <div id="table-wrap">
       <table id="results-table">
         <colgroup id="colgroup"></colgroup>
         <thead><tr id="thead-row"></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
-  </div>
-</main>
 
-<!-- Context menu -->
-<div id="ctx-menu">
-  <ul id="ctx-list"></ul>
+  </div>
+
 </div>
 
-<!-- Toast -->
+<div id="ctx-menu"><ul id="ctx-list"></ul></div>
 <div id="toast"></div>
 
 <script>
-// ── State ────────────────────────────────────────────────
 let SOURCES = [];
 let enabledSources = new Set();
-let rows = [];          // [{card, results, cheapest_price, cheapest_url, ck_usd, ck_ratio}]
+let rows = [];
 let sortCol = null;
 let sortAsc = true;
 let selectedIdx = null;
 let abortCtrl = null;
 let lastClickIdx = null;
 
-// ── Init ─────────────────────────────────────────────────
 async function init() {
   const res = await fetch('/sources');
   SOURCES = await res.json();
   enabledSources = new Set(SOURCES);
 
-  // Build source toggles
   const grid = document.getElementById('source-grid');
   SOURCES.forEach(s => {
     const lbl = document.createElement('label');
@@ -473,27 +489,20 @@ async function init() {
     grid.appendChild(lbl);
   });
 
-  // Build table headers
   buildTableHeaders();
-
-  // Poll CK status
   pollCKStatus();
 }
 
 function buildTableHeaders() {
   const tr = document.getElementById('thead-row');
   const cg = document.getElementById('colgroup');
-  tr.innerHTML = '';
-  cg.innerHTML = '';
-
+  tr.innerHTML = ''; cg.innerHTML = '';
   const cols = ['Card', ...SOURCES, 'Cheapest', 'CK%'];
-  cols.forEach((c, i) => {
+  cols.forEach(c => {
     const th = document.createElement('th');
-    th.textContent = c;
-    th.dataset.col = c;
+    th.textContent = c; th.dataset.col = c;
     th.addEventListener('click', () => sortBy(c));
     tr.appendChild(th);
-
     const col = document.createElement('col');
     col.className = c === 'Card' ? 'col-card' : c === 'Cheapest' ? 'col-cheapest' : c === 'CK%' ? 'col-ck' : 'col-price';
     cg.appendChild(col);
@@ -506,26 +515,19 @@ async function pollCKStatus() {
     try {
       const r = await fetch('/ck-status');
       const d = await r.json();
-      if (d.ready) {
-        badge.textContent = `CK: ${d.count.toLocaleString()} cards`;
-        badge.classList.add('ready');
-      } else {
-        badge.textContent = 'CK Loading…';
-        setTimeout(check, 2000);
-      }
+      if (d.ready) { badge.textContent = `CK: ${d.count.toLocaleString()} cards`; badge.classList.add('ready'); }
+      else { badge.textContent = 'CK Loading...'; setTimeout(check, 2000); }
     } catch { setTimeout(check, 3000); }
   };
   check();
 }
 
-// ── Search ───────────────────────────────────────────────
 document.getElementById('btn-search').addEventListener('click', startSearch);
 document.getElementById('btn-stop').addEventListener('click', stopSearch);
 
 async function startSearch() {
   const text = document.getElementById('deck-input').value.trim();
   if (!text) { toast('Paste a decklist first'); return; }
-
   const cards = parseDecklist(text);
   if (!cards.length) { toast('No cards found in input'); return; }
 
@@ -535,49 +537,29 @@ async function startSearch() {
   document.getElementById('total-label').textContent = 'AU $0.00';
   document.getElementById('progress-bar').value = 0;
   document.getElementById('progress-bar').max = 100;
-
   document.getElementById('btn-search').style.display = 'none';
   document.getElementById('btn-stop').style.display = '';
-
   abortCtrl = new AbortController();
 
-  const body = {
-    cards,
-    enabled_sources: [...enabledSources],
-    hareruya_lang: document.getElementById('hareruya-lang').value,
-  };
+  const body = { cards, enabled_sources: [...enabledSources], hareruya_lang: document.getElementById('hareruya-lang').value };
 
   try {
-    const res = await fetch('/search/stream', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body),
-      signal: abortCtrl.signal,
-    });
-
+    const res = await fetch('/search/stream', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: abortCtrl.signal });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
-
     while (true) {
       const {value, done} = await reader.read();
       if (done) break;
       buf += decoder.decode(value, {stream: true});
-      const lines = buf.split('\n');
-      buf = lines.pop();
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          handleSSE(JSON.parse(line.slice(6)));
-        }
-      }
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) { if (line.startsWith('data: ')) handleSSE(JSON.parse(line.slice(6))); }
     }
-  } catch (e) {
-    if (e.name !== 'AbortError') console.error(e);
-  }
+  } catch (e) { if (e.name !== 'AbortError') console.error(e); }
 
   document.getElementById('btn-search').style.display = '';
   document.getElementById('btn-stop').style.display = 'none';
-  setStatus('Done ✓');
+  setStatus('Done!');
 }
 
 function stopSearch() {
@@ -590,21 +572,19 @@ function stopSearch() {
 function handleSSE(msg) {
   if (msg.type === 'start') {
     document.getElementById('progress-bar').max = msg.total;
-    setStatus(`Searching 0 / ${msg.total}…`);
+    setStatus(`Searching 0 / ${msg.total}...`);
   } else if (msg.type === 'result') {
     rows.push(msg);
     appendRow(msg);
     document.getElementById('progress-bar').value = msg.index;
-    setStatus(`Searching ${msg.index} / ${document.getElementById('progress-bar').max}…`);
-    updateTotal();
-    updateMissing();
+    setStatus(`Searching ${msg.index} / ${document.getElementById('progress-bar').max}...`);
+    updateTotal(); updateMissing();
   } else if (msg.type === 'done') {
-    setStatus(`Done — ${rows.length} cards`);
+    setStatus(`Done! ${rows.length} cards loaded.`);
     document.getElementById('progress-bar').value = document.getElementById('progress-bar').max;
   }
 }
 
-// ── Table rendering ──────────────────────────────────────
 function appendRow(data) {
   const tr = document.createElement('tr');
   tr.dataset.idx = rows.length - 1;
@@ -617,54 +597,28 @@ function appendRow(data) {
 
 function renderRowCells(tr, data) {
   tr.innerHTML = '';
-  // Card name
   const tdCard = document.createElement('td');
-  tdCard.className = 'card-name';
-  tdCard.textContent = data.card;
-  tdCard.title = data.card;
+  tdCard.className = 'card-name'; tdCard.textContent = data.card; tdCard.title = data.card;
   tr.appendChild(tdCard);
 
-  // Per-source prices
   SOURCES.forEach(s => {
-    const td = document.createElement('td');
-    td.className = 'price';
-    if (!enabledSources.has(s)) {
-      td.textContent = '–';
-      td.style.color = 'var(--border)';
-      tr.appendChild(td); return;
-    }
-    const r = data.results?.[s];
-    const price = r?.price || 0;
+    const td = document.createElement('td'); td.className = 'price';
+    if (!enabledSources.has(s)) { td.textContent = '-'; td.style.color = '#808080'; tr.appendChild(td); return; }
+    const r = data.results?.[s]; const price = r?.price || 0;
     if (price > 0) {
-      td.textContent = s === 'Hareruya' && r?.jpy
-        ? `$${price.toFixed(2)} (¥${r.jpy})`
-        : `$${price.toFixed(2)}`;
-      if (price === data.cheapest_price) {
-        td.style.color = 'var(--green)';
-        td.style.fontWeight = '700';
-      }
-    } else {
-      td.textContent = '–';
-      td.style.color = 'var(--text-muted)';
-    }
+      td.textContent = s === 'Hareruya' && r?.jpy ? `$${price.toFixed(2)} (Y${r.jpy})` : `$${price.toFixed(2)}`;
+      if (price === data.cheapest_price) { td.style.color = '#006600'; td.style.fontWeight = 'bold'; }
+    } else { td.textContent = '-'; td.style.color = '#808080'; }
     tr.appendChild(td);
   });
 
-  // Cheapest
-  const tdC = document.createElement('td');
-  tdC.className = 'cheapest';
-  tdC.textContent = data.cheapest_price > 0 ? `$${data.cheapest_price.toFixed(2)}` : '–';
+  const tdC = document.createElement('td'); tdC.className = 'cheapest';
+  tdC.textContent = data.cheapest_price > 0 ? `$${data.cheapest_price.toFixed(2)}` : '-';
   tr.appendChild(tdC);
 
-  // CK%
-  const tdCK = document.createElement('td');
-  tdCK.className = 'ck-col';
-  if (data.ck_ratio != null) {
-    tdCK.textContent = `${Math.round(data.ck_ratio * 100)}%`;
-  } else {
-    tdCK.textContent = '–';
-    tdCK.style.color = 'var(--text-muted)';
-  }
+  const tdCK = document.createElement('td'); tdCK.className = 'ck-col';
+  if (data.ck_ratio != null) { tdCK.textContent = `${Math.round(data.ck_ratio * 100)}%`; }
+  else { tdCK.textContent = '-'; tdCK.style.color = '#808080'; }
   tr.appendChild(tdCK);
 }
 
@@ -674,39 +628,26 @@ function applyRowColour(tr, ratio) {
   let r, g, b;
   if (ratio >= 1.0) {
     const intensity = Math.min(1.0, (clamped - 1.0) / 1.5);
-    r = Math.round(255 - intensity * 120);
-    g = 255;
-    b = Math.round(255 - intensity * 120);
+    r = Math.round(255 - intensity * 80); g = Math.round(230 - intensity * 30); b = Math.round(255 - intensity * 80);
   } else {
     const intensity = Math.min(1.0, (1.0 - clamped) / 0.75);
-    r = 255;
-    g = Math.round(255 - intensity * 120);
-    b = Math.round(255 - intensity * 120);
+    r = 255; g = Math.round(220 - intensity * 80); b = Math.round(220 - intensity * 80);
   }
-  // Blend with dark background for readability
-  const mix = (c) => Math.round(c * 0.22 + 26 * 0.78);
-  tr.style.setProperty('--row-base', `rgb(${mix(r)},${mix(g)},${mix(b)})`);
-  tr.style.background = `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+  tr.style.background = `rgb(${r},${g},${b})`;
 }
 
 function recalcCheapest() {
   let total = 0;
   rows.forEach((data, i) => {
-    // Recalc cheapest over enabled sources only
-    let cheapest = Infinity;
-    let cheapSource = '';
-    let cheapUrl = '';
+    let cheapest = Infinity, cheapUrl = '';
     SOURCES.forEach(s => {
       if (!enabledSources.has(s)) return;
       const p = data.results?.[s]?.price || 0;
-      if (p > 0 && p < cheapest) { cheapest = p; cheapSource = s; cheapUrl = data.results[s].url; }
+      if (p > 0 && p < cheapest) { cheapest = p; cheapUrl = data.results[s].url; }
     });
     if (cheapest === Infinity) cheapest = 0;
-    data.cheapest_price = cheapest;
-    data.cheapest_url = cheapUrl;
-    if (data.ck_usd && cheapest > 0) data.ck_ratio = data.ck_usd / cheapest;
-    else data.ck_ratio = null;
-
+    data.cheapest_price = cheapest; data.cheapest_url = cheapUrl;
+    data.ck_ratio = (data.ck_usd && cheapest > 0) ? data.ck_usd / cheapest : null;
     const tr = document.querySelector(`#tbody tr[data-idx="${i}"]`);
     if (tr) { renderRowCells(tr, data); applyRowColour(tr, data.ck_ratio); }
     total += cheapest;
@@ -721,93 +662,62 @@ function updateTotal() {
 }
 
 function updateMissing() {
-  const ul = document.getElementById('missing-list');
-  ul.innerHTML = '';
+  const ul = document.getElementById('missing-list'); ul.innerHTML = '';
   [...new Set(rows.filter(r => !r.cheapest_price || r.cheapest_price === 0).map(r => r.card))].sort().forEach(c => {
     const li = document.createElement('li'); li.textContent = c; ul.appendChild(li);
   });
 }
 
-// ── Row interaction ──────────────────────────────────────
 function onRowClick(e) {
   const idx = +e.currentTarget.dataset.idx;
   document.querySelectorAll('#tbody tr').forEach(r => r.classList.remove('selected'));
   e.currentTarget.classList.add('selected');
-
   if (lastClickIdx === idx) {
-    // Double-click style: open cheapest
-    const url = rows[idx]?.cheapest_url;
-    if (url) window.open(url, '_blank');
-    lastClickIdx = null;
-  } else {
-    lastClickIdx = idx;
-    selectedIdx = idx;
-    setTimeout(() => { if (lastClickIdx === idx) lastClickIdx = null; }, 500);
-  }
+    const url = rows[idx]?.cheapest_url; if (url) window.open(url, '_blank'); lastClickIdx = null;
+  } else { lastClickIdx = idx; selectedIdx = idx; setTimeout(() => { if (lastClickIdx === idx) lastClickIdx = null; }, 500); }
 }
 
 function onRowRightClick(e) {
-  e.preventDefault();
-  const idx = +e.currentTarget.dataset.idx;
-  selectedIdx = idx;
+  e.preventDefault(); const idx = +e.currentTarget.dataset.idx; selectedIdx = idx;
   showContextMenu(e.clientX, e.clientY, idx);
 }
 
 function showContextMenu(x, y, idx) {
-  const menu = document.getElementById('ctx-menu');
-  const ul = document.getElementById('ctx-list');
-  ul.innerHTML = '';
-
+  const menu = document.getElementById('ctx-menu'); const ul = document.getElementById('ctx-list'); ul.innerHTML = '';
   const data = rows[idx];
-  // Open cheapest
   const liC = document.createElement('li');
-  liC.textContent = `⬡ Open Cheapest ($${(data?.cheapest_price||0).toFixed(2)})`;
+  liC.textContent = `Open Cheapest ($${(data?.cheapest_price||0).toFixed(2)})`;
   liC.addEventListener('click', () => { if (data?.cheapest_url) window.open(data.cheapest_url,'_blank'); hideCtx(); });
   ul.appendChild(liC);
-
   const div = document.createElement('li'); div.className='divider'; ul.appendChild(div);
-
   SOURCES.forEach(s => {
-    const url = data?.results?.[s]?.url;
-    const price = data?.results?.[s]?.price || 0;
+    const url = data?.results?.[s]?.url; const price = data?.results?.[s]?.price || 0;
     if (!url || !price) return;
     const li = document.createElement('li');
     li.textContent = `${s}  $${price.toFixed(2)}`;
     li.addEventListener('click', () => { window.open(url,'_blank'); hideCtx(); });
     ul.appendChild(li);
   });
-
   menu.style.left = `${Math.min(x, window.innerWidth-200)}px`;
-  menu.style.top  = `${Math.min(y, window.innerHeight-300)}px`;
+  menu.style.top = `${Math.min(y, window.innerHeight-300)}px`;
   menu.classList.add('open');
 }
 
 function hideCtx() { document.getElementById('ctx-menu').classList.remove('open'); }
 document.addEventListener('click', hideCtx);
 
-// ── Open All ─────────────────────────────────────────────
 document.getElementById('btn-open-all').addEventListener('click', () => {
-  let n = 0;
-  rows.forEach(r => { if (r.cheapest_url) { window.open(r.cheapest_url,'_blank'); n++; } });
+  let n = 0; rows.forEach(r => { if (r.cheapest_url) { window.open(r.cheapest_url,'_blank'); n++; } });
   toast(`Opened ${n} tabs`);
 });
 
-// ── Export CSV ───────────────────────────────────────────
 document.getElementById('btn-export').addEventListener('click', () => {
   if (!rows.length) { toast('No data to export'); return; }
   const headers = ['Card', ...SOURCES, 'Cheapest (AUD)', 'CK USD', 'CK Ratio', 'Cheapest URL'];
   const csvRows = [headers.join(',')];
   rows.forEach(r => {
     const prices = SOURCES.map(s => r.results?.[s]?.price > 0 ? r.results[s].price.toFixed(2) : '');
-    const row = [
-      `"${r.card}"`,
-      ...prices,
-      r.cheapest_price > 0 ? r.cheapest_price.toFixed(2) : '',
-      r.ck_usd != null ? r.ck_usd.toFixed(2) : '',
-      r.ck_ratio != null ? r.ck_ratio.toFixed(4) : '',
-      `"${r.cheapest_url || ''}"`,
-    ];
-    csvRows.push(row.join(','));
+    csvRows.push([`"${r.card}"`, ...prices, r.cheapest_price > 0 ? r.cheapest_price.toFixed(2) : '', r.ck_usd != null ? r.ck_usd.toFixed(2) : '', r.ck_ratio != null ? r.ck_ratio.toFixed(4) : '', `"${r.cheapest_url || ''}"`].join(','));
   });
   const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
   const a = document.createElement('a');
@@ -816,16 +726,12 @@ document.getElementById('btn-export').addEventListener('click', () => {
   a.click();
 });
 
-// ── Sort ─────────────────────────────────────────────────
 function sortBy(col) {
-  if (sortCol === col) sortAsc = !sortAsc;
-  else { sortCol = col; sortAsc = true; }
-
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = true; }
   document.querySelectorAll('thead th').forEach(th => {
     th.classList.remove('sorted-asc','sorted-desc');
     if (th.dataset.col === col) th.classList.add(sortAsc ? 'sorted-asc' : 'sorted-desc');
   });
-
   rows.sort((a, b) => {
     let va, vb;
     if (col === 'Card') { va = a.card; vb = b.card; }
@@ -835,72 +741,50 @@ function sortBy(col) {
     if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
     return sortAsc ? va - vb : vb - va;
   });
-
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = '';
+  const tbody = document.getElementById('tbody'); tbody.innerHTML = '';
   rows.forEach((data, i) => {
-    data._idx = i;
-    const tr = document.createElement('tr');
-    tr.dataset.idx = i;
-    renderRowCells(tr, data);
-    applyRowColour(tr, data.ck_ratio);
-    tr.addEventListener('click', onRowClick);
-    tr.addEventListener('contextmenu', onRowRightClick);
+    data._idx = i; const tr = document.createElement('tr'); tr.dataset.idx = i;
+    renderRowCells(tr, data); applyRowColour(tr, data.ck_ratio);
+    tr.addEventListener('click', onRowClick); tr.addEventListener('contextmenu', onRowRightClick);
     tbody.appendChild(tr);
   });
 }
 
-// ── Deck URL fetch ───────────────────────────────────────
 document.getElementById('btn-fetch-url').addEventListener('click', async () => {
-  const url = document.getElementById('url-input').value.trim();
-  if (!url) return;
-  setStatus('Fetching deck…');
+  const url = document.getElementById('url-input').value.trim(); if (!url) return;
+  setStatus('Fetching deck...');
   try {
     const sb = document.getElementById('cb-sideboard').checked;
     const mb = document.getElementById('cb-maybeboard').checked;
     const res = await fetch(`/fetch-deck?url=${encodeURIComponent(url)}&include_sideboard=${sb}&include_maybeboard=${mb}`);
     const data = await res.json();
     if (data.error) { toast('Error: ' + data.error); return; }
-    const text = data.cards.map(c => `${c.qty} ${c.name}`).join('\n');
-    document.getElementById('deck-input').value = text;
+    document.getElementById('deck-input').value = data.cards.map(c => `${c.qty} ${c.name}`).join('\n');
     setStatus(`Loaded ${data.cards.length} cards`);
   } catch (e) { toast('Failed to fetch deck: ' + e.message); }
 });
 
-// ── Toggle all sources ───────────────────────────────────
 document.getElementById('toggle-all-sources').addEventListener('click', () => {
   const allOn = SOURCES.every(s => enabledSources.has(s));
   document.querySelectorAll('#source-grid input[type=checkbox]').forEach(cb => {
-    cb.checked = !allOn;
-    const s = cb.dataset.src;
+    cb.checked = !allOn; const s = cb.dataset.src;
     if (!allOn) enabledSources.add(s); else enabledSources.delete(s);
   });
   recalcCheapest();
 });
 
-// ── Helpers ──────────────────────────────────────────────
 function parseDecklist(text) {
-  return text.split('\n')
-    .map(l => l.trim())
-    .filter(Boolean)
-    .map(l => l.replace(/^\d+x?\s*/, '').trim())
-    .filter(Boolean);
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => l.replace(/^\d+x?\s*/, '').trim()).filter(Boolean);
 }
-
-function setStatus(msg) {
-  document.getElementById('status-text').textContent = msg;
-}
-
+function setStatus(msg) { document.getElementById('status-text').textContent = msg; }
 let toastTimer;
 function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
 init();
 </script>
-</body>
-</html>
+
+
+</body></html>
