@@ -5,6 +5,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
+from unittest import result
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -153,11 +154,11 @@ async def search_stream(req: SearchRequest):
 
         for i, card in enumerate(req.cards, 1):
             result = await loop.run_in_executor(
-                None, fetch_card, card, req.enabled_sources, req.hareruya_lang
+        None, fetch_card, card, req.enabled_sources, req.hareruya_lang
             )
             payload = {"type": "result", "index": i, **result}
             yield f"data: {json.dumps(payload)}\n\n"
-            await asyncio.sleep(0)  # yield control
+            await asyncio.sleep(3)
 
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
