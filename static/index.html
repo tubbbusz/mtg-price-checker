@@ -1,8 +1,8 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- saved from url=(0045)file:///C:/Users/kaden/Downloads/index_3.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MTG Price Checker v1.0</title>
 <style>
   body {
@@ -404,10 +404,10 @@
   a { color: #0000ff; }
 </style>
 </head>
-<body>
+<body style="zoom: 150%;">
 
 <div id="titlebar">
-  <div id="titlebar-left">&#9830; MTG Price Checker v1.0</div>
+  <div id="titlebar-left">♦ MTG Price Checker v1.0</div>
   <div id="ck-badge">CK Loading...</div>
 
 </div>
@@ -477,7 +477,7 @@
 
       <!-- URL fetch row -->
       <div class="url-row">
-        <input type="text" id="url-input" placeholder="Paste deck URL..." />
+        <input type="text" id="url-input" placeholder="Paste deck URL...">
         <button class="btn" id="btn-fetch-url">Fetch</button>
       </div>
 
@@ -490,10 +490,14 @@
         <button class="btn" id="btn-delete-deck">Del</button>
       </div>
 
-      <textarea id="deck-input" placeholder="Paste decklist here...&#10;&#10;e.g.&#10;4 Lightning Bolt&#10;2 Counterspell"></textarea>
+      <textarea id="deck-input" placeholder="Paste decklist here...
+
+e.g.
+4 Lightning Bolt
+2 Counterspell"></textarea>
       <div class="btn-row">
-        <button class="btn btn-primary" id="btn-search" style="flex:1">&#9658; Search Prices</button>
-        <button class="btn btn-danger" id="btn-stop" style="display:none">&#9632; Stop</button>
+        <button class="btn btn-primary" id="btn-search" style="flex:1">► Search Prices</button>
+        <button class="btn btn-danger" id="btn-stop" style="display:none">■ Stop</button>
       </div>
       <div class="btn-row">
         <button class="btn" id="btn-open-all">Open All Cheapest</button>
@@ -508,7 +512,7 @@
         <label for="hareruya-lang">Hareruya Language:</label>
         <select id="hareruya-lang">
           <option value="EN">EN</option>
-          <option value="EN>JP">EN&gt;JP</option>
+          <option value="EN&gt;JP">EN&gt;JP</option>
           <option value="JP">JP</option>
           <option value="Other">Other</option>
           <option value="All">All</option>
@@ -516,11 +520,11 @@
       </div>
       <div class="setting-row">
         <label for="cb-sideboard">Include Sideboard</label>
-        <input type="checkbox" id="cb-sideboard" />
+        <input type="checkbox" id="cb-sideboard">
       </div>
       <div class="setting-row">
         <label for="cb-maybeboard">Include Maybeboard</label>
-        <input type="checkbox" id="cb-maybeboard" />
+        <input type="checkbox" id="cb-maybeboard">
       </div>
     </div>
 
@@ -549,7 +553,7 @@
         <span id="status-text">Ready -- paste a decklist and click Search Prices</span>
       </div>
       <div id="total-label">AU $0.00</div>
-      <button class="btn btn-primary" onclick="document.getElementById('btn-open-all').click()">Open All Cheapest</button>
+      <button class="btn btn-primary" onclick="document.getElementById(&#39;btn-open-all&#39;).click()">Open All Cheapest</button>
     </div>
 
     <div id="table-wrap">
@@ -985,9 +989,6 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-init();
-setZoom(150);
-
 // ── Menubar ───────────────────────────────────────────────
 let currentZoom = 150;
 let sidebarVisible = true;
@@ -1080,6 +1081,11 @@ document.getElementById('menu-about').addEventListener('click', () => {
   alert('MTG Price Checker v1.0\n\nCompares prices across 11 Australian and Japanese MTG stores.\n\nDouble-click a row to open the cheapest listing.\nRight-click a row to open from a specific source.');
   document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
 });
+
+// ── Startup ───────────────────────────────────────────────
+init();
+setZoom(150);
 </script>
-</body>
-</html>
+
+
+</body></html>
