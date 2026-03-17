@@ -1,8 +1,8 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- saved from url=(0045)file:///C:/Users/kaden/Downloads/index_2.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MTG Price Checker v1.0</title>
 <style>
   body {
@@ -37,12 +37,71 @@
 
   #menubar {
     background: #c0c0c0;
-    border-bottom: 1px solid #808080;
+    border-bottom: 2px solid #808080;
     border-top: 2px solid #ffffff;
     border-left: 2px solid #ffffff;
     border-right: 2px solid #808080;
-    padding: 2px 4px;
+    padding: 1px 2px;
     font-size: 12px;
+    display: flex;
+    align-items: stretch;
+    user-select: none;
+    position: relative;
+    z-index: 500;
+  }
+
+  /* Menu items in the bar */
+  .menu-item {
+    position: relative;
+    padding: 2px 8px;
+    cursor: default;
+    font-size: 12px;
+  }
+  .menu-item:hover,
+  .menu-item.open {
+    background: #000080;
+    color: #ffffff;
+  }
+  .menu-item u { text-decoration: underline; }
+
+  /* Dropdown panel */
+  .menu-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #c0c0c0;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    box-shadow: 2px 2px 0 #000000;
+    min-width: 160px;
+    z-index: 1000;
+    white-space: nowrap;
+  }
+  .menu-item.open .menu-dropdown { display: block; }
+
+  /* Dropdown entries */
+  .menu-entry {
+    padding: 4px 20px 4px 24px;
+    font-size: 11px;
+    cursor: default;
+    position: relative;
+  }
+  .menu-entry:hover { background: #000080; color: #ffffff; }
+  .menu-entry.disabled { color: #808080; }
+  .menu-entry.disabled:hover { background: transparent; color: #808080; cursor: default; }
+  .menu-entry.checked::before {
+    content: "\2713";
+    position: absolute;
+    left: 6px;
+    font-size: 11px;
+  }
+  .menu-separator {
+    border-top: 1px solid #808080;
+    border-bottom: 1px solid #ffffff;
+    margin: 3px 2px;
   }
 
   .raised {
@@ -346,15 +405,63 @@
 <body>
 
 <div id="titlebar">
-  <div id="titlebar-left">&#9830; MTG Price Checker v1.0</div>
+  <div id="titlebar-left">♦ MTG Price Checker v1.0</div>
   <div id="ck-badge">CK Loading...</div>
 </div>
 
 <div id="menubar">
-  <b><u>F</u>ile</b> &nbsp;|&nbsp;
-  <b><u>E</u>dit</b> &nbsp;|&nbsp;
-  <b><u>V</u>iew</b> &nbsp;|&nbsp;
-  <b><u>H</u>elp</b>
+
+  <!-- File -->
+  <div class="menu-item" data-menu="file">
+    <u>F</u>ile
+    <div class="menu-dropdown">
+      <div class="menu-entry disabled">New Decklist</div>
+      <div class="menu-entry disabled">Open File...</div>
+      <div class="menu-separator"></div>
+      <div class="menu-entry" id="menu-export-csv">Export CSV</div>
+      <div class="menu-separator"></div>
+      <div class="menu-entry disabled">Exit</div>
+    </div>
+  </div>
+
+  <!-- Edit -->
+  <div class="menu-item" data-menu="edit">
+    <u>E</u>dit
+    <div class="menu-dropdown">
+      <div class="menu-entry" id="menu-clear-deck">Clear Decklist</div>
+      <div class="menu-separator"></div>
+      <div class="menu-entry" id="menu-save-deck">Save Deck...</div>
+      <div class="menu-entry" id="menu-delete-deck">Delete Selected Deck</div>
+      <div class="menu-separator"></div>
+      <div class="menu-entry" id="menu-toggle-sources">Toggle All Sources</div>
+    </div>
+  </div>
+
+  <!-- View -->
+  <div class="menu-item" data-menu="view">
+    <u>V</u>iew
+    <div class="menu-dropdown">
+      <div class="menu-entry disabled" style="font-size:10px;color:#444;padding-bottom:2px">Zoom</div>
+      <div class="menu-entry zoom-entry checked" data-zoom="100">100% (Normal)</div>
+      <div class="menu-entry zoom-entry" data-zoom="125">125%</div>
+      <div class="menu-entry zoom-entry" data-zoom="150">150%</div>
+      <div class="menu-entry zoom-entry" data-zoom="175">175%</div>
+      <div class="menu-entry zoom-entry" data-zoom="200">200%</div>
+      <div class="menu-separator"></div>
+      <div class="menu-entry" id="menu-toggle-sidebar">Toggle Sidebar</div>
+    </div>
+  </div>
+
+  <!-- Help -->
+  <div class="menu-item" data-menu="help">
+    <u>H</u>elp
+    <div class="menu-dropdown">
+      <div class="menu-entry disabled">Documentation</div>
+      <div class="menu-separator"></div>
+      <div class="menu-entry" id="menu-about">About MTG Price Checker</div>
+    </div>
+  </div>
+
 </div>
 
 <div id="main-layout">
@@ -367,7 +474,7 @@
 
       <!-- URL fetch row -->
       <div class="url-row">
-        <input type="text" id="url-input" placeholder="Paste deck URL..." />
+        <input type="text" id="url-input" placeholder="Paste deck URL...">
         <button class="btn" id="btn-fetch-url">Fetch</button>
       </div>
 
@@ -380,10 +487,14 @@
         <button class="btn" id="btn-delete-deck">Del</button>
       </div>
 
-      <textarea id="deck-input" placeholder="Paste decklist here...&#10;&#10;e.g.&#10;4 Lightning Bolt&#10;2 Counterspell"></textarea>
+      <textarea id="deck-input" placeholder="Paste decklist here...
+
+e.g.
+4 Lightning Bolt
+2 Counterspell"></textarea>
       <div class="btn-row">
-        <button class="btn btn-primary" id="btn-search" style="flex:1">&#9658; Search Prices</button>
-        <button class="btn btn-danger" id="btn-stop" style="display:none">&#9632; Stop</button>
+        <button class="btn btn-primary" id="btn-search" style="flex:1">► Search Prices</button>
+        <button class="btn btn-danger" id="btn-stop" style="display:none">■ Stop</button>
       </div>
       <div class="btn-row">
         <button class="btn" id="btn-open-all">Open All Cheapest</button>
@@ -398,7 +509,7 @@
         <label for="hareruya-lang">Hareruya Language:</label>
         <select id="hareruya-lang">
           <option value="EN">EN</option>
-          <option value="EN>JP">EN&gt;JP</option>
+          <option value="EN&gt;JP">EN&gt;JP</option>
           <option value="JP">JP</option>
           <option value="Other">Other</option>
           <option value="All">All</option>
@@ -406,11 +517,11 @@
       </div>
       <div class="setting-row">
         <label for="cb-sideboard">Include Sideboard</label>
-        <input type="checkbox" id="cb-sideboard" />
+        <input type="checkbox" id="cb-sideboard">
       </div>
       <div class="setting-row">
         <label for="cb-maybeboard">Include Maybeboard</label>
-        <input type="checkbox" id="cb-maybeboard" />
+        <input type="checkbox" id="cb-maybeboard">
       </div>
     </div>
 
@@ -439,7 +550,7 @@
         <span id="status-text">Ready -- paste a decklist and click Search Prices</span>
       </div>
       <div id="total-label">AU $0.00</div>
-      <button class="btn btn-primary" onclick="document.getElementById('btn-open-all').click()">Open All Cheapest</button>
+      <button class="btn btn-primary" onclick="document.getElementById(&#39;btn-open-all&#39;).click()">Open All Cheapest</button>
     </div>
 
     <div id="table-wrap">
@@ -870,6 +981,100 @@ function toast(msg) {
 }
 
 init();
+
+// ── Menubar ───────────────────────────────────────────────
+let currentZoom = 100;
+let sidebarVisible = true;
+
+// Open/close menus on click
+document.querySelectorAll('.menu-item').forEach(item => {
+  item.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = item.classList.contains('open');
+    // Close all
+    document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  });
+  // If another menu is already open, hover-switches to this one
+  item.addEventListener('mouseenter', () => {
+    if (document.querySelector('.menu-item.open')) {
+      document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+      item.classList.add('open');
+    }
+  });
+});
+
+// Close on outside click
+document.addEventListener('click', () => {
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
+// Prevent dropdown clicks from closing the menu immediately
+document.querySelectorAll('.menu-dropdown').forEach(d => {
+  d.addEventListener('click', e => e.stopPropagation());
+});
+
+// ── Zoom ──────────────────────────────────────────────────
+function setZoom(pct) {
+  currentZoom = pct;
+  document.body.style.zoom = pct + '%';
+  // Update checkmarks
+  document.querySelectorAll('.zoom-entry').forEach(el => {
+    el.classList.toggle('checked', +el.dataset.zoom === pct);
+  });
+}
+
+document.querySelectorAll('.zoom-entry').forEach(el => {
+  el.addEventListener('click', () => {
+    setZoom(+el.dataset.zoom);
+    document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+  });
+});
+
+// ── Toggle sidebar ─────────────────────────────────────────
+document.getElementById('menu-toggle-sidebar').addEventListener('click', () => {
+  const sidebar = document.getElementById('sidebar');
+  sidebarVisible = !sidebarVisible;
+  sidebar.style.display = sidebarVisible ? '' : 'none';
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
+// ── File menu actions ─────────────────────────────────────
+document.getElementById('menu-export-csv').addEventListener('click', () => {
+  document.getElementById('btn-export').click();
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
+// ── Edit menu actions ──────────────────────────────────────
+document.getElementById('menu-clear-deck').addEventListener('click', () => {
+  if (window.confirm('Clear the decklist?')) {
+    document.getElementById('deck-input').value = '';
+    document.getElementById('url-input').value = '';
+  }
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
+document.getElementById('menu-save-deck').addEventListener('click', () => {
+  document.getElementById('btn-save-deck').click();
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
+document.getElementById('menu-delete-deck').addEventListener('click', () => {
+  document.getElementById('btn-delete-deck').click();
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
+document.getElementById('menu-toggle-sources').addEventListener('click', () => {
+  document.getElementById('toggle-all-sources').click();
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
+// ── Help menu ─────────────────────────────────────────────
+document.getElementById('menu-about').addEventListener('click', () => {
+  alert('MTG Price Checker v1.0\n\nCompares prices across 11 Australian and Japanese MTG stores.\n\nDouble-click a row to open the cheapest listing.\nRight-click a row to open from a specific source.');
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
 </script>
-</body>
-</html>
+
+
+</body></html>
