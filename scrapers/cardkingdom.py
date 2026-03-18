@@ -2,73 +2,82 @@ import gzip
 import json
 import requests
 import traceback
+import io
 
 _last_error = ""
 
 
 def load_ck_prices() -> dict:
+    """
+    AllPricesToday has UUID-keyed CK prices.
+    AllIdentifiers has UUID -> card name.
+    Stream AllIdentifiers line by line to avoid RAM issues.
+    """
     global _last_error
     headers = {"User-Agent": "ScrappingMyAss/1.0"}
 
-    # Try CK CSV first (tiny file, name-keyed)
     try:
-        print("[CK] Trying CK price CSV...")
-        import io, csv
-        r = requests.get(
-            "https://www.cardkingdom.com/export/price",
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=20,
-        )
-        print(f"[CK] CSV HTTP {r.status_code} size={len(r.content)}b preview={r.text[:300]!r}")
-        r.raise_for_status()
-        cache = {}
-        reader = csv.DictReader(io.StringIO(r.text))
-        print(f"[CK] CSV headers: {reader.fieldnames}")
-        for row in reader:
-            foil = row.get("Foil", "").strip().upper() in ("YES", "Y", "TRUE", "1")
-            if foil:
-                continue
-            name = (row.get("Name") or "").strip().lower()
-            price_str = (row.get("Retail Price") or row.get("Buy Price") or
-                        row.get("Price") or row.get("price_retail") or "0")
-            try:
-                price = float(str(price_str).replace("$","").strip() or 0)
-            except ValueError:
-                continue
-            if name and price > 0:
-                if name not in cache or price < cache[name]:
-                    cache[name] = price
-        if cache:
-            print(f"[CK] CSV success: {len(cache)} cards")
-            _last_error = ""
-            return cache
-        print(f"[CK] CSV empty after parse")
-    except Exception as e:
-        print(f"[CK] CSV failed: {e}")
-
-    # MTGJSON: stream and parse AllPricesToday only — log a sample entry
-    # to find what keys are available for name lookup
-    try:
-        print("[CK] Downloading AllPricesToday to inspect structure...")
-        r2 = requests.get(
+        # Step 1: get all UUIDs that have CK retail prices
+        print("[CK] Downloading AllPricesToday...")
+        r1 = requests.get(
             "https://mtgjson.com/api/v5/AllPricesToday.json.gz",
             headers=headers, timeout=60, stream=True,
         )
-        r2.raise_for_status()
-        prices_data = json.loads(gzip.decompress(r2.content)).get("data", {})
-        print(f"[CK] AllPricesToday: {len(prices_data)} UUIDs")
+        r1.raise_for_status()
+        prices_raw = json.loads(gzip.decompress(r1.content)).get("data", {})
+        print(f"[CK] AllPricesToday: {len(prices_raw)} UUIDs")
 
-        # Log first 3 entries completely to understand structure
-        for i, (uuid, block) in enumerate(prices_data.items()):
-            if i >= 3:
-                break
-            print(f"[CK] Entry {i}: uuid={uuid} keys={list(block.keys())} block={json.dumps(block)[:400]}")
+        # Extract only UUIDs with CK retail normal prices
+        ck_prices = {}  # uuid -> price
+        for uuid, block in prices_raw.items():
+            try:
+                ck_retail = (
+                    block.get("paper", {})
+                    .get("cardkingdom", {})
+                    .get("retail", {})
+                    .get("normal", {})
+                )
+                if not ck_retail:
+                    continue
+                price = float(list(ck_retail.values())[-1])
+                if price > 0:
+                    ck_prices[uuid] = price
+            except (TypeError, ValueError, AttributeError, IndexError):
+                continue
+
+        print(f"[CK] UUIDs with CK prices: {len(ck_prices)}")
+        del prices_raw  # free RAM
+
+        # Step 2: stream AllIdentifiers to get name for each UUID
+        # AllIdentifiers is large but we only need the "name" field per UUID
+        print("[CK] Downloading AllIdentifiers...")
+        r2 = requests.get(
+            "https://mtgjson.com/api/v5/AllIdentifiers.json.gz",
+            headers=headers, timeout=90, stream=True,
+        )
+        r2.raise_for_status()
+        all_ids = json.loads(gzip.decompress(r2.content)).get("data", {})
+        print(f"[CK] AllIdentifiers: {len(all_ids)} entries")
+
+        cache = {}
+        for uuid, price in ck_prices.items():
+            card = all_ids.get(uuid, {})
+            name = card.get("name", "").strip().lower()
+            if not name:
+                continue
+            if name not in cache or price < cache[name]:
+                cache[name] = price
+
+        del all_ids  # free RAM
+        print(f"[CK] Price cache: {len(cache)} cards")
+        _last_error = ""
+        return cache
 
     except Exception as e:
-        print(f"[CK] AllPricesToday inspect failed: {e}")
-
-    _last_error = "Could not load CK prices"
-    return {}
+        _last_error = f"{type(e).__name__}: {e}"
+        print(f"[CK] Failed: {_last_error}")
+        traceback.print_exc()
+        return {}
 
 
 def get_ck_price(card_name: str, cache: dict) -> float | None:
