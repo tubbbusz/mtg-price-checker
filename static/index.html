@@ -823,19 +823,24 @@ function renderRowCells(tr, data) {
 
 function applyRowColour(tr, ratio) {
   // ratio = our_price / ck_price
-  // < 1.0 means we are cheaper than CK = GREEN
-  // > 1.0 means we are more expensive than CK = RED
-  if (ratio == null) return;
-  const clamped = Math.max(0.25, Math.min(2.0, ratio));
+  // < 1.0 = cheaper than CK = GREEN
+  // > 1.0 = more expensive than CK = RED
+  // near 1.0 = neutral white
+  if (ratio == null) { tr.style.background = ''; return; }
+  const neutral = [255, 255, 255];
   let r, g, b;
   if (ratio <= 1.0) {
-    // cheaper than CK: green, deeper green the cheaper we are
-    const intensity = Math.min(1.0, (1.0 - clamped) / 0.75);
-    r = Math.round(255 - intensity * 80); g = Math.round(230 - intensity * 30); b = Math.round(255 - intensity * 80);
+    // white -> green as ratio goes from 1.0 -> 0.0
+    const intensity = Math.min(1.0, (1.0 - ratio) / 0.75);
+    r = Math.round(255 - intensity * 180);  // drops to ~75
+    g = Math.round(255 - intensity * 55);   // stays high ~200
+    b = Math.round(255 - intensity * 180);  // drops to ~75
   } else {
-    // more expensive than CK: red
-    const intensity = Math.min(1.0, (clamped - 1.0) / 1.0);
-    r = 255; g = Math.round(220 - intensity * 80); b = Math.round(220 - intensity * 80);
+    // white -> red as ratio goes from 1.0 -> 2.0+
+    const intensity = Math.min(1.0, (ratio - 1.0) / 1.0);
+    r = 255;                                // stays high
+    g = Math.round(255 - intensity * 180);  // drops to ~75
+    b = Math.round(255 - intensity * 180);  // drops to ~75
   }
   tr.style.background = `rgb(${r},${g},${b})`;
 }
