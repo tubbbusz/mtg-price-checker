@@ -58,7 +58,7 @@ def fetch_mtgmate_price(card_name: str, set_name: str = None, set_code: str = No
                     if price <= 0:
                         continue
                     finish = uuid_data.get("finish", "").lower()
-                    card_is_foil = "foil" in finish
+                    card_is_foil = finish == "foil"
                     if is_foil != card_is_foil:
                         continue
                     results.append((price, uuid_data.get("name", card_name), url))
@@ -113,7 +113,7 @@ def fetch_mtgmate_price(card_name: str, set_name: str = None, set_code: str = No
         num_match = re.search(r"/(\d+[a-z]*)(?::foil)?$", link_path)
         card_number = num_match.group(1) if num_match else ""
         card_finish = details.get("finish", "").lower()
-        card_is_foil = "foil" in card_finish
+        card_is_foil = card_finish == "foil"
         card_set_name = details.get("set_name", "")
 
         if set_name and card_set_name.lower() != set_name.lower():
