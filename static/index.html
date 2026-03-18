@@ -920,9 +920,16 @@ document.addEventListener('click', hideCtx);
 document.getElementById('btn-open-all').addEventListener('click', () => {
   const urls = rows.map(r => r.cheapest_url).filter(Boolean);
   if (!urls.length) { toast('No results yet'); return; }
-  // Stagger opens by 150ms each to avoid browser popup blocker
-  urls.forEach((url, i) => setTimeout(() => window.open(url, '_blank'), i * 150));
-  toast(`Opening ${urls.length} tabs...`);
+  // Open one tab at a time with a 500ms gap to avoid popup blocker
+  let i = 0;
+  function openNext() {
+    if (i >= urls.length) { toast(`Opened ${urls.length} tabs`); return; }
+    window.open(urls[i], '_blank');
+    i++;
+    setTimeout(openNext, 500);
+  }
+  openNext();
+  toast(`Opening tab 1 of ${urls.length}...`);
 });
 
 // ── Export CSV ───────────────────────────────────────────
