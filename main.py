@@ -99,7 +99,7 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
     cheapest_url = results.get(cheapest_source, {}).get("url", "") if cheapest_source else ""
 
     ck_usd = get_ck_price(card, _ck_cache)
-    ck_ratio = round(ck_usd / cheapest_price, 4) if (ck_usd and cheapest_price > 0) else None
+    ck_ratio = round(cheapest_price / ck_usd, 4) if (ck_usd and cheapest_price > 0) else None
 
     return {
         "card": card,
@@ -219,3 +219,42 @@ async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False,
 @app.get("/ck-status")
 def ck_status():
     return {"ready": _ck_ready.is_set(), "count": len(_ck_cache), "error": ck_last_error()}
+
+@app.get("/ck-debug")
+def ck_debug():
+    """Hit this URL in your browser to see exactly what CK loading is doing."""
+    import requests, gzip
+    results = {}
+
+    # Test 1: AtomicCards
+    try:
+        r = requests.get("https://mtgjson.com/api/v5/AtomicCards.json.gz",
+            headers={"User-Agent": "ScrappingMyAss/1.0"}, timeout=30, stream=True)
+        results["atomic_status"] = r.status_code
+        results["atomic_size_kb"] = len(r.content) // 1024
+        data = gzip.decompress(r.content)
+        parsed = __import__("json").loads(data)
+        results["atomic_cards"] = len(parsed.get("data", {}))
+    except Exception as e:
+        results["atomic_error"] = str(e)
+
+    # Test 2: AllPricesToday
+    try:
+        r2 = requests.get("https://mtgjson.com/api/v5/AllPricesToday.json.gz",
+            headers={"User-Agent": "ScrappingMyAss/1.0"}, timeout=30, stream=True)
+        results["prices_status"] = r2.status_code
+        results["prices_size_kb"] = len(r2.content) // 1024
+        data2 = gzip.decompress(r2.content)
+        parsed2 = __import__("json").loads(data2)
+        uuids = parsed2.get("data", {})
+        results["prices_uuids"] = len(uuids)
+        # Sample: check if cardkingdom key exists
+        sample = next(iter(uuids.values()), {})
+        results["sample_has_ck"] = "cardkingdom" in sample.get("paper", {})
+    except Exception as e:
+        results["prices_error"] = str(e)
+
+    results["cache_count"] = len(_ck_cache)
+    results["cache_ready"] = _ck_ready.is_set()
+    results["last_error"] = ck_last_error()
+    return results
