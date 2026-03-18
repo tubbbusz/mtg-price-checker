@@ -68,6 +68,9 @@ class SearchRequest(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
     """Run all enabled scrapers for one card in parallel threads."""
+    from scrapers.utils import parse_card_query
+    card_name, set_code, number, foil, etched = parse_card_query(card)
+
     futures = {}
     with ThreadPoolExecutor(max_workers=len(enabled)) as ex:
         for name in enabled:
@@ -75,9 +78,13 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
             if not fn:
                 continue
             if name == "Hareruya":
-                futures[name] = ex.submit(fn, card, hareruya_lang)
+                futures[name] = ex.submit(fn, card_name, hareruya_lang)
+            elif name == "MTGMate":
+                futures[name] = ex.submit(fn, card_name,
+                                          None, set_code, number,
+                                          True if foil else (False if set_code or number else None))
             else:
-                futures[name] = ex.submit(fn, card)
+                futures[name] = ex.submit(fn, card_name)
 
     results = {}
     for name, fut in futures.items():
@@ -98,11 +105,11 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
     cheapest_source = next((n for n, p in prices if p == cheapest_price), "")
     cheapest_url = results.get(cheapest_source, {}).get("url", "") if cheapest_source else ""
 
-    ck_usd = get_ck_price(card, _ck_cache)
+    ck_usd = get_ck_price(card_name, _ck_cache)
     ck_ratio = round(cheapest_price / ck_usd, 4) if (ck_usd and cheapest_price > 0) else None
 
     return {
-        "card": card,
+        "card": card,  # keep original query as display name
         "results": results,
         "cheapest_price": cheapest_price,
         "cheapest_source": cheapest_source,
