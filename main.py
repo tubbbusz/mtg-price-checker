@@ -82,7 +82,7 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
             elif name == "MTGMate":
                 futures[name] = ex.submit(fn, card_name,
                                           None, set_code, number,
-                                          True if foil else (False if set_code or number else None))
+                                          True if foil else (False if etched else None))
             else:
                 futures[name] = ex.submit(fn, card_name)
 

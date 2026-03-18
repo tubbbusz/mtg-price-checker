@@ -5,27 +5,37 @@ from bs4 import BeautifulSoup
 from .utils import normalize, parse_card_query
 
 
+def _make_safe_name(card_name: str) -> str:
+    """Convert card name to MTGMate URL format, preserving // for DFCs."""
+    # Double-faced cards: 'A // B' -> 'A_//_B'
+    name = card_name.replace(' // ', '_//_')
+    # Replace remaining spaces with underscores, strip other special chars
+    name = re.sub(r'[^a-zA-Z0-9_/]', '', name)
+    name = re.sub(r'\s+', '_', name)
+    return name
+
+
 def fetch_mtgmate_price(card_name: str, set_name: str = None, set_code: str = None,
                         number: str = None, foil: bool = None):
 
-    # MTGMate has a direct card URL if we have set_code + number
-    # e.g. /cards/Sol_Ring/AFC/215 or /cards/Sol_Ring/AFC/215:foil
-    # Try direct URL first if we have enough info
     scraper = cloudscraper.create_scraper()
 
+    # Try direct URL first if we have set_code + number
     if set_code and number:
-        safe_name = re.sub(r'[^a-zA-Z0-9\s]', '', card_name)
-        safe_name = re.sub(r'\s+', '_', safe_name.strip())
+        safe_name = _make_safe_name(card_name)
         base_url = f"https://www.mtgmate.com.au/cards/{safe_name}/{set_code.upper()}/{number}"
 
-        results = []
-        for suffix, is_foil in [("", False), (":foil", True)]:
-            # Skip if foil filter doesn't match
-            if foil is True and not is_foil:
-                continue
-            if foil is False and is_foil:
-                continue
+        # Decide which variants to try
+        variants = []
+        if foil is True:
+            variants = [(":foil", True)]
+        elif foil is False:
+            variants = [("", False)]
+        else:
+            variants = [("", False), (":foil", True)]
 
+        results = []
+        for suffix, is_foil in variants:
             try:
                 url = base_url + suffix
                 r = scraper.get(url, timeout=20)
@@ -33,28 +43,25 @@ def fetch_mtgmate_price(card_name: str, set_name: str = None, set_code: str = No
                     continue
                 r.raise_for_status()
                 soup = BeautifulSoup(r.text, "html.parser")
-
-                # Check in stock
                 container = soup.find("div", {"data-react-class": "FilterableTable"})
-                if container:
-                    props = json.loads(container.get("data-react-props", "{}"))
-                    for uuid_data in props.get("uuid", {}).values():
-                        qty = uuid_data.get("quantity", 0)
-                        if qty <= 0:
-                            continue
-                        try:
-                            price = int(uuid_data.get("price", 0)) / 100
-                        except Exception:
-                            continue
-                        if price <= 0:
-                            continue
-                        finish = uuid_data.get("finish", "").lower()
-                        card_is_foil = "foil" in finish
-                        if foil is True and not card_is_foil:
-                            continue
-                        if foil is False and card_is_foil:
-                            continue
-                        results.append((price, uuid_data.get("name", card_name), url))
+                if not container:
+                    continue
+                props = json.loads(container.get("data-react-props", "{}"))
+                for uuid_data in props.get("uuid", {}).values():
+                    qty = uuid_data.get("quantity", 0)
+                    if qty <= 0:
+                        continue
+                    try:
+                        price = int(uuid_data.get("price", 0)) / 100
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+                    finish = uuid_data.get("finish", "").lower()
+                    card_is_foil = "foil" in finish
+                    if is_foil != card_is_foil:
+                        continue
+                    results.append((price, uuid_data.get("name", card_name), url))
             except Exception:
                 continue
 
@@ -101,12 +108,10 @@ def fetch_mtgmate_price(card_name: str, set_name: str = None, set_code: str = No
         if price <= 0 or qty <= 0:
             continue
 
-        # Set code from direct field (lowercase in MTGMate)
         card_set_code = details.get("set_code", "")
-        # Number from link_path
         link_path = details.get("link_path", "")
-        match = re.search(r"/(\d+[a-z]*)(?::foil)?$", link_path)
-        card_number = match.group(1) if match else ""
+        num_match = re.search(r"/(\d+[a-z]*)(?::foil)?$", link_path)
+        card_number = num_match.group(1) if num_match else ""
         card_finish = details.get("finish", "").lower()
         card_is_foil = "foil" in card_finish
         card_set_name = details.get("set_name", "")
