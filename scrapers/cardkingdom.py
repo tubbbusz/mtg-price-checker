@@ -1,43 +1,74 @@
-import cloudscraper
+import gzip
+import json
+import requests
 import threading
 import traceback
 
-_scraper = None
-_scraper_lock = threading.Lock()
 _last_error = ""
 
 
-def _get_scraper():
-    global _scraper
-    with _scraper_lock:
-        if _scraper is None:
-            _scraper = cloudscraper.create_scraper(
-                browser={"browser": "chrome", "platform": "windows", "desktop": True}
-            )
-    return _scraper
-
-
 def load_ck_prices() -> dict:
+    """
+    Load CK retail prices from MTGJSON.
+    Uses AllPricesToday (today only = small file) keyed by UUID,
+    and AtomicCards (name-keyed) to build the UUID->name mapping.
+    Falls back cleanly if anything fails.
+    """
     global _last_error
-    try:
-        print("[CK] Fetching pricelist via cloudscraper...")
-        scraper = _get_scraper()
-        r = scraper.get(
-            "https://api.cardkingdom.com/api/v2/pricelist",
-            timeout=45,
-        )
-        print(f"[CK] HTTP {r.status_code} | preview: {r.text[:200]}")
-        r.raise_for_status()
-        data = r.json()
 
+    headers = {"User-Agent": "ScrappingMyAss/1.0"}
+
+    try:
+        # Step 1: AtomicCards.json.gz — name-keyed, contains mtgjsonId per printing
+        # This lets us build name -> set of UUIDs
+        print("[CK] Downloading AtomicCards...")
+        r1 = requests.get(
+            "https://mtgjson.com/api/v5/AtomicCards.json.gz",
+            headers=headers, timeout=60, stream=True,
+        )
+        r1.raise_for_status()
+        atomic = json.loads(gzip.decompress(r1.content)).get("data", {})
+        print(f"[CK] AtomicCards loaded: {len(atomic)} cards")
+
+        # Build uuid -> canonical name map
+        uuid_to_name = {}
+        for name, printings in atomic.items():
+            # printings is a list of card face objects
+            for face in (printings if isinstance(printings, list) else [printings]):
+                uid = face.get("identifiers", {}).get("mtgjsonId")
+                if uid:
+                    uuid_to_name[uid] = name
+
+        print(f"[CK] UUID map: {len(uuid_to_name)} entries")
+
+        # Step 2: AllPricesToday.json.gz — UUID-keyed, today only (small)
+        print("[CK] Downloading AllPricesToday...")
+        r2 = requests.get(
+            "https://mtgjson.com/api/v5/AllPricesToday.json.gz",
+            headers=headers, timeout=60, stream=True,
+        )
+        r2.raise_for_status()
+        prices_data = json.loads(gzip.decompress(r2.content)).get("data", {})
+        print(f"[CK] AllPricesToday loaded: {len(prices_data)} UUIDs")
+
+        # Step 3: Build name -> cheapest CK retail USD
         cache = {}
-        for item in data.get("data", []):
-            if str(item.get("is_foil", "0")) == "1":
+        for uuid, price_block in prices_data.items():
+            name = uuid_to_name.get(uuid, "").strip().lower()
+            if not name:
                 continue
-            name = item.get("name", "").strip().lower()
             try:
-                price = float(item.get("price_retail", 0) or 0)
-            except (TypeError, ValueError):
+                ck_retail = (
+                    price_block.get("paper", {})
+                    .get("cardkingdom", {})
+                    .get("retail", {})
+                    .get("normal", {})
+                )
+                if not ck_retail:
+                    continue
+                # dict of {date: price} — grab latest value
+                price = float(list(ck_retail.values())[-1])
+            except (TypeError, ValueError, AttributeError, IndexError):
                 continue
             if price <= 0:
                 continue
@@ -45,7 +76,7 @@ def load_ck_prices() -> dict:
                 cache[name] = price
 
         _last_error = ""
-        print(f"[CK] Loaded {len(cache)} prices")
+        print(f"[CK] Built price cache: {len(cache)} cards")
         return cache
 
     except Exception as e:
