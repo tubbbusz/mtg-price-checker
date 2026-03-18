@@ -1,64 +1,62 @@
-import re
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import quote_plus
+import cloudscraper
+import threading
+import traceback
 
+_scraper = None
+_scraper_lock = threading.Lock()
 _last_error = ""
 
 
+def _get_scraper():
+    global _scraper
+    with _scraper_lock:
+        if _scraper is None:
+            _scraper = cloudscraper.create_scraper(
+                browser={"browser": "chrome", "platform": "windows", "desktop": True}
+            )
+    return _scraper
+
+
 def load_ck_prices() -> dict:
-    """CK prices are now fetched per-card at search time."""
-    print("[CK] Per-card scraping mode — no bulk load needed")
-    return {"_ready": True}  # non-empty so badge shows ready
+    global _last_error
+    try:
+        print("[CK] Fetching pricelist via cloudscraper...")
+        scraper = _get_scraper()
+        r = scraper.get(
+            "https://api.cardkingdom.com/api/v2/pricelist",
+            timeout=45,
+        )
+        print(f"[CK] HTTP {r.status_code} | preview: {r.text[:200]}")
+        r.raise_for_status()
+        data = r.json()
+
+        cache = {}
+        for item in data.get("data", []):
+            if str(item.get("is_foil", "0")) == "1":
+                continue
+            name = item.get("name", "").strip().lower()
+            try:
+                price = float(item.get("price_retail", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if price <= 0:
+                continue
+            if name not in cache or price < cache[name]:
+                cache[name] = price
+
+        _last_error = ""
+        print(f"[CK] Loaded {len(cache)} prices")
+        return cache
+
+    except Exception as e:
+        _last_error = f"{type(e).__name__}: {e}"
+        print(f"[CK] Failed: {_last_error}")
+        traceback.print_exc()
+        return {}
 
 
 def get_ck_price(card_name: str, cache: dict) -> float | None:
-    """Scrape CK search page for cheapest NM in-stock price."""
-    global _last_error
-    try:
-        url = (
-            f"https://www.cardkingdom.com/catalog/view"
-            f"?filter[search]=mtg_advanced&filter[name]={quote_plus(card_name)}"
-        )
-        r = requests.get(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
-            timeout=15,
-        )
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        best = None
-        for item in soup.select("div.productItemWrapper"):
-            # Get card name from the title link
-            title_tag = item.select_one("span.productDetailTitle a")
-            if not title_tag:
-                continue
-            item_name = title_tag.get_text(strip=True).lower()
-            if item_name != card_name.strip().lower():
-                continue
-
-            # Find NM add-to-cart form — must be active (in stock)
-            for li in item.select("li.itemAddToCart.NM"):
-                # Skip if out of stock
-                if li.select_one("div.outOfStockNotice"):
-                    continue
-                price_tag = li.select_one("span.stylePrice")
-                if not price_tag:
-                    continue
-                m = re.search(r"\$([\d.]+)", price_tag.get_text())
-                if not m:
-                    continue
-                price = float(m.group(1))
-                if price > 0 and (best is None or price < best):
-                    best = price
-
-        _last_error = ""
-        return best
-
-    except Exception as e:
-        _last_error = str(e)
-        return None
+    return cache.get(card_name.strip().lower()) if cache else None
 
 
 def get_last_error() -> str:

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>MTG Price Checker v1.0</title>
+<title>Scraping My Ass v1.0</title>
 <style>
   body {
     font-family: Arial, Helvetica, sans-serif;
@@ -407,7 +407,7 @@
 <body>
 
 <div id="titlebar">
-  <div id="titlebar-left">&#9830; MTG Price Checker v1.0</div>
+  <div id="titlebar-left">Scraping My Ass v1.0</div>
   <div id="ck-badge">CK Loading...</div>
 
 </div>
@@ -447,7 +447,8 @@
       <div class="menu-entry disabled" style="font-size:10px;color:#444;padding-bottom:2px">Zoom</div>
       <div class="menu-entry zoom-entry" data-zoom="100">100% (Normal)</div>
       <div class="menu-entry zoom-entry" data-zoom="125">125%</div>
-      <div class="menu-entry zoom-entry checked" data-zoom="150">150%</div>
+      <div class="menu-entry zoom-entry checked" data-zoom="133">133%</div>
+      <div class="menu-entry zoom-entry" data-zoom="150">150%</div>
       <div class="menu-entry zoom-entry" data-zoom="175">175%</div>
       <div class="menu-entry zoom-entry" data-zoom="200">200%</div>
       <div class="menu-separator"></div>
@@ -704,10 +705,10 @@ async function pollCKStatus() {
       const d = await r.json();
       if (d.ready) {
         if (d.count > 0) {
-          badge.textContent = 'CK: live (per card)';
+          badge.textContent = `CK: ${d.count.toLocaleString()} cards`;
           badge.classList.add('ready');
         } else {
-          badge.textContent = d.error ? `CK: ${d.error.slice(0, 40)}` : 'CK: unavailable';
+          badge.textContent = d.error ? `CK error` : 'CK: unavailable';
           badge.classList.remove('ready');
         }
       } else { badge.textContent = 'CK Loading...'; setTimeout(check, 2000); }
@@ -991,7 +992,7 @@ function toast(msg) {
 }
 
 // ── Menubar ───────────────────────────────────────────────
-let currentZoom = 150;
+let currentZoom = 133;
 let sidebarVisible = true;
 
 // Open/close menus on click
@@ -1079,13 +1080,13 @@ document.getElementById('menu-toggle-sources').addEventListener('click', () => {
 
 // ── Help menu ─────────────────────────────────────────────
 document.getElementById('menu-about').addEventListener('click', () => {
-  alert('MTG Price Checker v1.0\n\nCompares prices across 11 Australian and Japanese MTG stores.\n\nDouble-click a row to open the cheapest listing.\nRight-click a row to open from a specific source.');
+  alert('Scraping My Ass v1.0\n\nCompares prices across 11 Australian and Japanese MTG stores.\n\nDouble-click a row to open the cheapest listing.\nRight-click a row to open from a specific source.');
   document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
 });
 
 // ── Startup ───────────────────────────────────────────────
 init();
-setZoom(150);
+setZoom(133);
 </script>
 </body>
 </html>
