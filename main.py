@@ -21,7 +21,7 @@ from scrapers.kcg import scrape_kcg
 from scrapers.moonmtg import scrape_moonmtg
 from scrapers.mtgmate import fetch_mtgmate_price
 from scrapers.shuffled import scrape_shuffled
-from scrapers.cardkingdom import get_ck_price, load_ck_prices
+from scrapers.cardkingdom import get_ck_price, load_ck_prices, get_last_error as ck_last_error
 
 app = FastAPI(title="MTG Price Checker")
 
@@ -67,9 +67,10 @@ class SearchRequest(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
-    """Run all enabled scrapers for one card in parallel threads."""
+    """Run all enabled scrapers + CK for one card in parallel threads."""
     futures = {}
-    with ThreadPoolExecutor(max_workers=len(enabled)) as ex:
+    # +1 worker for CK
+    with ThreadPoolExecutor(max_workers=len(enabled) + 1) as ex:
         for name in enabled:
             fn = SCRAPERS.get(name)
             if not fn:
@@ -78,6 +79,8 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
                 futures[name] = ex.submit(fn, card, hareruya_lang)
             else:
                 futures[name] = ex.submit(fn, card)
+        # CK runs in parallel as a price reference (not a store source)
+        ck_future = ex.submit(get_ck_price, card, _ck_cache)
 
     results = {}
     for name, fut in futures.items():
@@ -98,7 +101,10 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
     cheapest_source = next((n for n, p in prices if p == cheapest_price), "")
     cheapest_url = results.get(cheapest_source, {}).get("url", "") if cheapest_source else ""
 
-    ck_usd = get_ck_price(card, _ck_cache)
+    try:
+        ck_usd = ck_future.result(timeout=30)
+    except Exception:
+        ck_usd = None
     ck_ratio = round(ck_usd / cheapest_price, 4) if (ck_usd and cheapest_price > 0) else None
 
     return {
@@ -218,4 +224,7 @@ async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False,
 
 @app.get("/ck-status")
 def ck_status():
-    return {"ready": _ck_ready.is_set(), "count": len(_ck_cache)}
+    ready = _ck_ready.is_set()
+    # In per-card mode, cache has a sentinel key "_ready"
+    active = ready and "_ready" in _ck_cache
+    return {"ready": ready, "count": 1 if active else 0, "error": ck_last_error() if not active else ""}
