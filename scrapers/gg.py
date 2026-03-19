@@ -205,6 +205,7 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
         except Exception:
             pass
 
+    print(f"[GGAus] meta results: {len(results)} known_ids: {len(known_ids)} instock_ids: {len(instock_ids)}")
     if results:
         return min(results, key=lambda x: x[0])
 
