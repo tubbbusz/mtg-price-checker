@@ -7,9 +7,13 @@ from urllib.parse import quote_plus
 from .utils import normalize
 from .setnames import get_set_name
 
+SPURIT_RE = re.compile(
+    r"Spurit\.Preorder2\.snippet\.products\[['\"]([^'\"]+)['\"]\]\s*=\s*"
+    r"(\{[^;]{1,20000}\})\s*;"
+)
+
 
 def _extract_base_name(title):
-    """Extract card name stripping (variants) and [Set]"""
     title = title.split(" - ")[0]
     title = re.sub(r"\[.*?\]", "", title)
     title = re.sub(r"\(.*?\)", "", title)
@@ -19,17 +23,16 @@ def _extract_base_name(title):
     return title.strip()
 
 
-def _is_foil_title(title: str) -> bool:
-    condition = title.split(" - ")[-1].lower()
-    return "foil" in condition
+def _is_foil_title(title):
+    return "foil" in title.split(" - ")[-1].lower()
 
 
-def _get_set_from_title(title: str) -> str:
+def _get_set_from_title(title):
     m = re.search(r"\[([^\]]+)\]", title)
     return m.group(1).strip() if m else ""
 
 
-def _find_matching_bracket(text: str, open_pos: int) -> int:
+def _find_matching_bracket(text, open_pos):
     n = len(text)
     if open_pos < 0 or open_pos >= n or text[open_pos] != "{":
         return -1
@@ -78,7 +81,6 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
             onclick = div.get("onclick", "")
             match = re.search(r"addToCart\([^,]+,'([^']+)'", onclick)
             full_title = match.group(1).strip() if match else "N/A"
-
             price_tag = div.find("p")
             price_text = price_tag.get_text(strip=True) if price_tag else ""
             pm = re.search(r"\$([\d.,]+)", price_text)
@@ -86,17 +88,14 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
 
             if _extract_base_name(full_title) != target:
                 continue
-
             title_is_foil = _is_foil_title(full_title)
             title_set = _get_set_from_title(full_title).lower()
-
             if foil is True and not title_is_foil:
                 continue
             if foil is False and title_is_foil:
                 continue
             if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
                 continue
-
             results.append((price, full_title, url))
 
         if not results:
@@ -106,17 +105,17 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
         return 0.0, "Error", ""
 
 
-def scrape_ggadelaide(card_name: str, set_code=None, number=None, foil=None):
+def scrape_ggadelaide(card_name, set_code=None, number=None, foil=None):
     return scrape_gg(card_name, "https://ggadelaide.com.au", set_code, number, foil)
 
 
-def scrape_ggmodbury(card_name: str, set_code=None, number=None, foil=None):
+def scrape_ggmodbury(card_name, set_code=None, number=None, foil=None):
     return scrape_gg(card_name, "https://ggmodbury.com.au", set_code, number, foil)
 
 
 # ── GG Australia ─────────────────────────────────────────────────────────────
 
-def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
+def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
     target = _norm_gg(card_name)
     target_set_name = get_set_name(set_code).lower() if set_code else None
 
@@ -133,51 +132,60 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
     page_text = r.text
     results = []
 
-    # ── Method 1: ShopifyAnalytics.meta — has all products with full variant data ──
-    meta_match = re.search(r'var meta\s*=\s*(\{"products"\s*:\s*\[.*?\].*?\})\s*;', page_text, re.S)
+    # Build in-stock variant ID set from Spurit blocks (has inventory_quantity)
+    instock_ids = set()
+    for sm in SPURIT_RE.finditer(page_text):
+        try:
+            obj = json.loads(sm.group(2))
+            for v in obj.get("variants", []):
+                if int(v.get("inventory_quantity", 0) or 0) > 0:
+                    instock_ids.add(int(v["id"]))
+        except Exception:
+            pass
+
+    # Method 1: ShopifyAnalytics.meta — full variant data with SKUs
+    meta_match = re.search(
+        r'var meta\s*=\s*(\{"products"\s*:\s*\[.*?\].*?\})\s*;',
+        page_text, re.S
+    )
     if meta_match:
         try:
             meta = json.loads(meta_match.group(1))
             for prod in meta.get("products", []):
-                name = prod.get("handle", "").replace("-", " ")
-                # Use the product name from variants
-                prod_title = ""
-                for v in prod.get("variants", []):
-                    vname = v.get("name", "")
-                    if " - " in vname:
-                        prod_title = vname.split(" - ")[0].strip()
-                        break
-
-                if not prod_title:
-                    continue
-
-                base = re.sub(r"\(.*?\)", "", prod_title.split("[")[0]).strip()
-                if target != _norm_gg(base):
-                    continue
-
-                prod_set = _get_set_from_title(prod_title).lower()
-                if target_set_name and target_set_name not in prod_set and prod_set not in target_set_name:
-                    continue
-
                 handle = prod.get("handle", "")
-                base_url = f"https://tcg.goodgames.com.au/products/{handle}"
+                base_url_prod = f"https://tcg.goodgames.com.au/products/{handle}"
 
                 for v in prod.get("variants", []):
+                    vid = v.get("id")
                     sku = v.get("sku", "")
-                    variant_title = v.get("public_title") or v.get("name", "").split(" - ")[-1]
-                    # SKU format: SET-NUM-LANG-FO/NF-CONDITION
-                    variant_is_foil = "-FO-" in sku or "foil" in variant_title.lower()
+                    public_title = v.get("public_title", "")
+                    full_name = v.get("name", "")
 
+                    # Stock check — only proceed if in Spurit instock set
+                    if instock_ids and vid not in instock_ids:
+                        continue
+
+                    # NM only: SKU ends in -1, or public_title is "Near Mint ..."
+                    if not sku.endswith("-1") and "near mint" not in public_title.lower():
+                        continue
+
+                    # Foil check via SKU (-FO- vs -NF-)
+                    variant_is_foil = "-FO-" in sku or "foil" in public_title.lower()
                     if foil is True and not variant_is_foil:
                         continue
                     if foil is False and variant_is_foil:
                         continue
 
-                    # Only Near Mint (condition 1) — skip LP/MP/HP/Damaged
-                    if not variant_title.strip().endswith("1") and "near mint" not in variant_title.lower():
-                        # SKU condition: -NF-1 or -FO-1 means NM
-                        if not sku.endswith("-1"):
-                            continue
+                    # Card name check
+                    prod_title = full_name.split(" - ")[0].strip() if " - " in full_name else full_name
+                    base = re.sub(r"\(.*?\)", "", prod_title.split("[")[0]).strip()
+                    if target != _norm_gg(base):
+                        continue
+
+                    # Set check
+                    prod_set = _get_set_from_title(prod_title).lower()
+                    if target_set_name and target_set_name not in prod_set and prod_set not in target_set_name:
+                        continue
 
                     try:
                         price = float(v.get("price", 0)) / 100
@@ -186,33 +194,15 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
                     if price <= 0:
                         continue
 
-                    vid = v.get("id")
-                    vurl = f"{base_url}?variant={vid}" if vid else base_url
-                    results.append((price, f"{prod_title} — {variant_title}", vurl))
+                    vurl = f"{base_url_prod}?variant={vid}" if vid else base_url_prod
+                    results.append((price, f"{prod_title} — {public_title}", vurl))
         except Exception:
             pass
-
-    # ── Build in-stock variant ID set from Spurit blocks ────────────────────
-    instock_ids = set()
-    key_pattern_spurit = re.compile(r"Spurit\.Preorder2\.snippet\.products\[['"]([^'"]+)['"]\]\s*=\s*(\{[^;]+\})\s*;")
-    for sm in key_pattern_spurit.finditer(page_text):
-        try:
-            obj = json.loads(sm.group(2))
-            for v in obj.get("variants", []):
-                if int(v.get("inventory_quantity", 0) or 0) > 0:
-                    instock_ids.add(v.get("id"))
-        except Exception:
-            pass
-
-    # Filter meta results to in-stock only (if we have Spurit data)
-    if instock_ids:
-        results = [(p, l, u) for p, l, u in results
-                   if any(str(vid) in u for vid in instock_ids)]
 
     if results:
         return min(results, key=lambda x: x[0])
 
-    # ── Method 2: st-product HTML cards (fallback) ────────────────────────────
+    # Method 2: st-product HTML cards
     soup = BeautifulSoup(page_text, "html.parser")
     for card in soup.select("div.st-product"):
         title_tag = card.select_one("div.product-title a span") or card.select_one("div.product-title a")
@@ -232,7 +222,6 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
         inner_foiled = inner is not None and "foiled" in inner.get("class", [])
         title_foiled = any("foil" in p.lower() for p in re.findall(r"\(([^)]+)\)", full_title))
         card_is_foil = inner_foiled or title_foiled
-
         if foil is True and not card_is_foil:
             continue
         if foil is False and card_is_foil:
@@ -255,30 +244,32 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
         href = link_tag.get("href", "") if link_tag else ""
         if href and not href.startswith("http"):
             href = "https://tcg.goodgames.com.au" + href
-
         results.append((price, full_title, href))
 
-    # ── Method 3: Spurit blocks ───────────────────────────────────────────────
-    key_pattern = re.compile(r"Spurit\.Preorder2\.snippet\.products\[\s*['\"]([^'\"]+)['\"]\s*\]\s*=\s*(\{[^;]+\})\s*;")
-    for m in key_pattern.finditer(page_text):
+    # Method 3: Spurit blocks directly
+    for sm in SPURIT_RE.finditer(page_text):
         try:
-            obj = json.loads(m.group(2))
+            obj = json.loads(sm.group(2))
         except Exception:
             continue
-
         title = obj.get("title", "")
         base_title = re.sub(r"\(.*?\)", "", title.split("[")[0]).strip()
         if target != _norm_gg(base_title):
             continue
-
         title_set = _get_set_from_title(title).lower()
         if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
             continue
-
         handle = obj.get("handle", "")
         for v in obj.get("variants", []):
-            qty = int(v.get("inventory_quantity", 0) or 0)
-            if qty <= 0:
+            if int(v.get("inventory_quantity", 0) or 0) <= 0:
+                continue
+            vtitle = v.get("title", "")
+            if "near mint" not in vtitle.lower():
+                continue
+            variant_is_foil = "foil" in vtitle.lower()
+            if foil is True and not variant_is_foil:
+                continue
+            if foil is False and variant_is_foil:
                 continue
             try:
                 price = float(v.get("price", 0)) / 100.0
@@ -286,17 +277,11 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
                 continue
             if price <= 0:
                 continue
-            vtitle = v.get("title", "").lower()
-            variant_is_foil = "foil" in vtitle
-            if foil is True and not variant_is_foil:
-                continue
-            if foil is False and variant_is_foil:
-                continue
             vid = v.get("id")
             product_url = f"https://tcg.goodgames.com.au/products/{handle}"
             if vid:
                 product_url += f"?variant={vid}"
-            results.append((price, f"{title} — {v.get('title', '')}", product_url))
+            results.append((price, f"{title} — {vtitle}", product_url))
 
     if not results:
         return 0.0, "Out of stock", ""
