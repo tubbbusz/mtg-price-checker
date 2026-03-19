@@ -9,7 +9,7 @@ from .setnames import get_set_name
 
 
 def _extract_base_name(title):
-    """Extract card name from GG title: 'Name (variant) [Set] - Condition'"""
+    """Extract card name stripping (variants) and [Set]"""
     title = title.split(" - ")[0]
     title = re.sub(r"\[.*?\]", "", title)
     title = re.sub(r"\(.*?\)", "", title)
@@ -59,7 +59,7 @@ def _norm_gg(text):
     return text.strip()
 
 
-# ── GG Adelaide + Modbury (same engine) ──────────────────────────────────────
+# ── GG Adelaide + Modbury ────────────────────────────────────────────────────
 
 def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
     target = _extract_base_name(card_name)
@@ -114,7 +114,7 @@ def scrape_ggmodbury(card_name: str, set_code=None, number=None, foil=None):
     return scrape_gg(card_name, "https://ggmodbury.com.au", set_code, number, foil)
 
 
-# ── GG Australia (tcg.goodgames.com.au) ──────────────────────────────────────
+# ── GG Australia ─────────────────────────────────────────────────────────────
 
 def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
     target = _norm_gg(card_name)
@@ -130,11 +130,67 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
     except Exception:
         return 0.0, "Error", ""
 
-    soup = BeautifulSoup(r.text, "html.parser")
     page_text = r.text
     results = []
 
-    # ── Primary: st-product cards (server-rendered HTML) ─────────────────
+    # ── Method 1: ShopifyAnalytics.meta — has all products with full variant data ──
+    meta_match = re.search(r'var meta\s*=\s*(\{"products"\s*:\s*\[.*?\].*?\})\s*;', page_text, re.S)
+    if meta_match:
+        try:
+            meta = json.loads(meta_match.group(1))
+            for prod in meta.get("products", []):
+                name = prod.get("handle", "").replace("-", " ")
+                # Use the product name from variants
+                prod_title = ""
+                for v in prod.get("variants", []):
+                    vname = v.get("name", "")
+                    if " - " in vname:
+                        prod_title = vname.split(" - ")[0].strip()
+                        break
+
+                if not prod_title:
+                    continue
+
+                base = re.sub(r"\(.*?\)", "", prod_title.split("[")[0]).strip()
+                if target != _norm_gg(base):
+                    continue
+
+                prod_set = _get_set_from_title(prod_title).lower()
+                if target_set_name and target_set_name not in prod_set and prod_set not in target_set_name:
+                    continue
+
+                handle = prod.get("handle", "")
+                base_url = f"https://tcg.goodgames.com.au/products/{handle}"
+
+                for v in prod.get("variants", []):
+                    sku = v.get("sku", "")
+                    variant_title = v.get("public_title") or v.get("name", "").split(" - ")[-1]
+                    # SKU format: SET-NUM-LANG-FO/NF-CONDITION
+                    variant_is_foil = "-FO-" in sku or "foil" in variant_title.lower()
+
+                    if foil is True and not variant_is_foil:
+                        continue
+                    if foil is False and variant_is_foil:
+                        continue
+
+                    try:
+                        price = float(v.get("price", 0)) / 100
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+
+                    vid = v.get("id")
+                    vurl = f"{base_url}?variant={vid}" if vid else base_url
+                    results.append((price, f"{prod_title} — {variant_title}", vurl))
+        except Exception:
+            pass
+
+    if results:
+        return min(results, key=lambda x: x[0])
+
+    # ── Method 2: st-product HTML cards (fallback) ────────────────────────────
+    soup = BeautifulSoup(page_text, "html.parser")
     for card in soup.select("div.st-product"):
         title_tag = card.select_one("div.product-title a span") or card.select_one("div.product-title a")
         if not title_tag:
@@ -144,15 +200,11 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
         if target != _norm_gg(base_title):
             continue
 
-        # Set name from subtitle or title brackets
         set_tag = card.select_one("div.st-subtitle")
         card_set = set_tag.get_text(strip=True).lower() if set_tag else _get_set_from_title(full_title).lower()
         if target_set_name and target_set_name not in card_set and card_set not in target_set_name:
             continue
 
-        # Foil detection:
-        # 1. product-inner has class "foiled" (cards with both foil/non-foil variants)
-        # 2. Title parenthetical contains "foil" (foil-only products like Surge Foil)
         inner = card.select_one("div.product-inner")
         inner_foiled = inner is not None and "foiled" in inner.get("class", [])
         title_foiled = any("foil" in p.lower() for p in re.findall(r"\(([^)]+)\)", full_title))
@@ -163,10 +215,7 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
         if foil is False and card_is_foil:
             continue
 
-        # Price — prefer no-sale price, fall back to discounted
         price_tag = card.select_one("div.product-prices.no-sale span")
-        if not price_tag:
-            price_tag = card.select_one("div.product-prices span")
         if not price_tag:
             continue
         pm = re.search(r"\$([\d,]+\.?\d*)", price_tag.get_text())
@@ -186,21 +235,11 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
 
         results.append((price, full_title, href))
 
-    # ── Secondary: Spurit blocks (some cards use this format) ────────────
-    key_pattern = re.compile(r"Spurit\.Preorder2\.snippet\.products\[\s*['\"]([^'\"]+)['\"]\s*\]\s*=", re.S)
+    # ── Method 3: Spurit blocks ───────────────────────────────────────────────
+    key_pattern = re.compile(r"Spurit\.Preorder2\.snippet\.products\[\s*['\"]([^'\"]+)['\"]\s*\]\s*=\s*(\{[^;]+\})\s*;")
     for m in key_pattern.finditer(page_text):
-        brace_pos = page_text.find("{", m.end())
-        if brace_pos == -1:
-            continue
-        end_pos = _find_matching_bracket(page_text, brace_pos)
-        if end_pos == -1:
-            continue
-        block = page_text[brace_pos:end_pos + 1]
-        fixed = re.sub(r'([{\s,])([A-Za-z0-9_]+)\s*:', r'\1"\2":', block)
-        fixed = fixed.replace("'", '"')
-        fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
         try:
-            obj = json.loads(fixed)
+            obj = json.loads(m.group(2))
         except Exception:
             continue
 
