@@ -151,13 +151,12 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
             continue
 
         # Foil detection:
-        # 1. Title parenthetical contains "foil": "Sol Ring (Surge Foil) [...]"
-        # 2. Variant badge has holo background (foil-only products like CC:Green)
-        title_parens = re.findall(r"\(([^)]+)\)", full_title)
-        paren_has_foil = any("foil" in p.lower() for p in title_parens)
-        variant_span = card.select_one("span.variant-short-term")
-        badge_is_foil = bool(variant_span and "holo" in variant_span.get("style", ""))
-        card_is_foil = paren_has_foil or badge_is_foil
+        # 1. product-inner has class "foiled" (cards with both foil/non-foil variants)
+        # 2. Title parenthetical contains "foil" (foil-only products like Surge Foil)
+        inner = card.select_one("div.product-inner")
+        inner_foiled = inner is not None and "foiled" in inner.get("class", [])
+        title_foiled = any("foil" in p.lower() for p in re.findall(r"\(([^)]+)\)", full_title))
+        card_is_foil = inner_foiled or title_foiled
 
         if foil is True and not card_is_foil:
             continue
