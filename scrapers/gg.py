@@ -7,11 +7,6 @@ from urllib.parse import quote_plus
 from .utils import normalize
 from .setnames import get_set_name
 
-SPURIT_RE = re.compile(
-    r"Spurit\.Preorder2\.snippet\.products\[['\"]([^'\"]+)['\"]\]\s*=\s*"
-    r"(\{[^;]{1,20000}\})\s*;"
-)
-
 
 def _extract_base_name(title):
     title = title.split(" - ")[0]
@@ -130,87 +125,10 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
         return 0.0, "Error", ""
 
     page_text = r.text
+    soup = BeautifulSoup(page_text, "html.parser")
     results = []
 
-    # Build in-stock and all-known variant ID sets from Spurit blocks
-    instock_ids = set()   # variant IDs with qty > 0
-    known_ids = set()     # all variant IDs seen in Spurit (regardless of stock)
-    for sm in SPURIT_RE.finditer(page_text):
-        try:
-            obj = json.loads(sm.group(2))
-            for v in obj.get("variants", []):
-                vid = int(v["id"])
-                known_ids.add(vid)
-                if int(v.get("inventory_quantity", 0) or 0) > 0:
-                    instock_ids.add(vid)
-        except Exception:
-            pass
-
-    # Method 1: ShopifyAnalytics.meta — full variant data with SKUs
-    meta_match = re.search(
-        r'var meta\s*=\s*(\{"products"\s*:\s*\[.*?\].*?\})\s*;',
-        page_text, re.S
-    )
-    if meta_match:
-        try:
-            meta = json.loads(meta_match.group(1))
-            for prod in meta.get("products", []):
-                handle = prod.get("handle", "")
-                base_url_prod = f"https://tcg.goodgames.com.au/products/{handle}"
-
-                for v in prod.get("variants", []):
-                    vid = v.get("id")
-                    sku = v.get("sku", "")
-                    public_title = v.get("public_title", "")
-                    full_name = v.get("name", "")
-
-                    # Stock check: if we've seen this variant in Spurit, it must be instock
-                    # If we haven't seen it at all in Spurit, skip it (can't verify stock)
-                    if vid in known_ids and vid not in instock_ids:
-                        continue
-                    if vid not in known_ids:
-                        continue  # not in Spurit = can't confirm stock
-
-                    # NM only: SKU ends in -1, or public_title is "Near Mint ..."
-                    if not sku.endswith("-1") and "near mint" not in public_title.lower():
-                        continue
-
-                    # Foil check via SKU (-FO- vs -NF-)
-                    variant_is_foil = "-FO-" in sku or "foil" in public_title.lower()
-                    if foil is True and not variant_is_foil:
-                        continue
-                    if foil is False and variant_is_foil:
-                        continue
-
-                    # Card name check
-                    prod_title = full_name.split(" - ")[0].strip() if " - " in full_name else full_name
-                    base = re.sub(r"\(.*?\)", "", prod_title.split("[")[0]).strip()
-                    if target != _norm_gg(base):
-                        continue
-
-                    # Set check
-                    prod_set = _get_set_from_title(prod_title).lower()
-                    if target_set_name and target_set_name not in prod_set and prod_set not in target_set_name:
-                        continue
-
-                    try:
-                        price = float(v.get("price", 0)) / 100
-                    except Exception:
-                        continue
-                    if price <= 0:
-                        continue
-
-                    vurl = f"{base_url_prod}?variant={vid}" if vid else base_url_prod
-                    results.append((price, f"{prod_title} — {public_title}", vurl))
-        except Exception:
-            pass
-
-    print(f"[GGAus] meta results: {len(results)} known_ids: {len(known_ids)} instock_ids: {len(instock_ids)}")
-    if results:
-        return min(results, key=lambda x: x[0])
-
-    # Method 2: st-product HTML cards
-    soup = BeautifulSoup(page_text, "html.parser")
+    # Method 1: st-product HTML cards (server-rendered, reliable)
     for card in soup.select("div.st-product"):
         title_tag = card.select_one("div.product-title a span") or card.select_one("div.product-title a")
         if not title_tag:
@@ -225,10 +143,12 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
         if target_set_name and target_set_name not in card_set and card_set not in target_set_name:
             continue
 
+        # Foil: product-inner has "foiled" class, or title parenthetical contains "foil"
         inner = card.select_one("div.product-inner")
         inner_foiled = inner is not None and "foiled" in inner.get("class", [])
         title_foiled = any("foil" in p.lower() for p in re.findall(r"\(([^)]+)\)", full_title))
         card_is_foil = inner_foiled or title_foiled
+
         if foil is True and not card_is_foil:
             continue
         if foil is False and card_is_foil:
@@ -253,10 +173,17 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
             href = "https://tcg.goodgames.com.au" + href
         results.append((price, full_title, href))
 
-    # Method 3: Spurit blocks directly
-    for sm in SPURIT_RE.finditer(page_text):
+    if results:
+        return min(results, key=lambda x: x[0])
+
+    # Method 2: Spurit blocks (some cards use this)
+    key_pattern = re.compile(
+        r"Spurit\.Preorder2\.snippet\.products\[['\"][^'\"]+['\"]\]\s*=\s*"
+        r"(\{[^;]{1,20000}\})\s*;"
+    )
+    for m in key_pattern.finditer(page_text):
         try:
-            obj = json.loads(sm.group(2))
+            obj = json.loads(m.group(1))
         except Exception:
             continue
         title = obj.get("title", "")
