@@ -35,6 +35,46 @@ def _norm_gg(text):
     return text.strip()
 
 
+def _parse_sku(sku: str):
+    """
+    Parse a GG SKU like 'MKM-148-EN-NF-1' into (set_code, collector_number, foil).
+    SKU format: <SET>-<NUMBER>-<LANG>-<FOIL_FLAG>-<CONDITION>
+    FOIL_FLAG: 'F' = foil, 'NF' = non-foil, 'EF' = etched foil
+    Returns (set_code, collector_number, foil) or (None, None, None) if unparseable.
+    """
+    parts = sku.upper().split("-")
+    # Need at least SET, NUMBER, LANG, FOIL_FLAG
+    if len(parts) < 4:
+        return None, None, None
+    set_code = parts[0]
+    collector_number = parts[1].lstrip("0")  # strip leading zeros for comparison
+    foil_flag = parts[3]
+    if foil_flag in ("F", "EF"):
+        foil = True
+    elif foil_flag == "NF":
+        foil = False
+    else:
+        foil = None
+    return set_code, collector_number, foil
+
+
+def _sku_matches(sku: str, target_set_code: str | None, target_number: str | None):
+    """
+    Return True if the SKU's set+number match the targets (when provided).
+    Comparison is case-insensitive; leading zeros on collector number are ignored.
+    """
+    if not target_set_code and not target_number:
+        return True
+    sku_set, sku_num, _ = _parse_sku(sku)
+    if sku_set is None:
+        return True  # can't determine — don't filter out
+    if target_set_code and sku_set != target_set_code.upper():
+        return False
+    if target_number and sku_num != target_number.lstrip("0"):
+        return False
+    return True
+
+
 def _find_matching_bracket(text, open_pos):
     n = len(text)
     if open_pos < 0 or open_pos >= n or text[open_pos] != "{":
@@ -114,12 +154,16 @@ SPURIT_KEY = re.compile(
 )
 
 
-def _parse_all_spurit(page_text, target, target_set_name):
+def _parse_all_spurit(page_text, target, target_set_name, set_code=None, number=None):
     """
     Parse all Spurit blocks matching target card name.
+
+    When set_code and/or number are provided, variants are additionally filtered
+    by SKU (e.g. 'MKM-148-EN-NF-1') so only the exact printing is returned.
+
     Returns (results_in_stock, matching_handles).
-    results_in_stock: list of (price, label, url) for in-stock NM variants
-    matching_handles: all handles that matched the card name (regardless of stock)
+      results_in_stock: list of (price, vtitle, label, url) for in-stock NM variants
+      matching_handles: all handles that matched the card name (regardless of stock)
     """
     results = []
     handles = set()
@@ -154,6 +198,12 @@ def _parse_all_spurit(page_text, target, target_set_name):
             vtitle = v.get("title", "")
             if "near mint" not in vtitle.lower():
                 continue
+
+            # ── Collector-number filter via SKU ──────────────────────────────
+            sku = v.get("sku", "")
+            if not _sku_matches(sku, set_code, number):
+                continue
+
             try:
                 price = float(v.get("price", 0)) / 100.0
             except Exception:
@@ -203,6 +253,15 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
                 continue
             if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
                 continue
+
+            # ── Collector-number filter via SKU ──────────────────────────────
+            # Adelaide/Modbury pages embed a data-sku or similar; try onclick for sku
+            sku_match = re.search(r"'([A-Z0-9]+-\d+-[A-Z]+-[A-Z]+-\d+)'", onclick)
+            if sku_match:
+                sku = sku_match.group(1)
+                if not _sku_matches(sku, set_code, number):
+                    continue
+
             results.append((price, full_title, url))
 
         if not results:
@@ -242,7 +301,10 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
     page_text = r.text
 
     # Parse all matching Spurit blocks — get in-stock results AND all handles
-    all_variants, handles = _parse_all_spurit(page_text, target, target_set_name)
+    # Pass set_code + number so SKU filtering happens inside
+    all_variants, handles = _parse_all_spurit(
+        page_text, target, target_set_name, set_code=set_code, number=number
+    )
 
     # Filter by foil preference
     results = []
@@ -254,7 +316,7 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
             continue
         results.append((price, label, url))
 
-    print(f"[GGAus] spurit={len(results)} handles={handles} foil={foil} card={card_name!r}")
+    print(f"[GGAus] spurit={len(results)} handles={handles} foil={foil} set={set_code} num={number} card={card_name!r}")
 
     if results:
         return min(results, key=lambda x: x[0])
@@ -276,6 +338,12 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
                 vtitle = v.get("title", "")
                 if "near mint" not in vtitle.lower():
                     continue
+
+                # ── Collector-number filter via SKU ──────────────────────────
+                sku = v.get("sku", "")
+                if not _sku_matches(sku, set_code, number):
+                    continue
+
                 variant_is_foil = "foil" in vtitle.lower()
                 if foil is True and not variant_is_foil:
                     continue
