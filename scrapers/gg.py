@@ -222,7 +222,7 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
     if candidates:
         return min(candidates, key=lambda x: x[0])
 
-    # JSON API fallback
+    # JSON API fallback — fetches variants per product for accurate foil/price data
     try:
         json_url = f"https://tcg.goodgames.com.au/search.json?q={query}&f_Product%20Type=mtg+single"
         r2 = requests.get(json_url, headers=headers, timeout=15)
@@ -243,21 +243,45 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
             if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
                 continue
 
+            # Fetch product page to get proper variant data
+            product_slug = slugify(name)
+            product_url = f"https://tcg.goodgames.com.au/products/{product_slug}"
             try:
-                price = float(prod.get("price", 0))
+                rp = requests.get(f"{product_url}.js", headers=headers, timeout=10)
+                rp.raise_for_status()
+                pdata = rp.json()
+                for v in pdata.get("variants", []):
+                    if not v.get("available", False):
+                        continue
+                    vtitle = v.get("title", "").lower()
+                    variant_is_foil = "foil" in vtitle
+                    if foil is True and not variant_is_foil:
+                        continue
+                    if foil is False and variant_is_foil:
+                        continue
+                    try:
+                        price = float(v.get("price", 0)) / 100.0
+                    except Exception:
+                        continue
+                    if price <= 0:
+                        continue
+                    vid = v.get("id")
+                    vurl = f"{product_url}?variant={vid}" if vid else product_url
+                    results.append((price, f"{name} — {v.get('title','')}", vurl))
             except Exception:
-                continue
-            if price <= 0:
-                continue
-
-            prod_is_foil = "foil" in name.lower()
-            if foil is True and not prod_is_foil:
-                continue
-            if foil is False and prod_is_foil:
-                continue
-
-            link = f"https://tcg.goodgames.com.au/products/{slugify(name)}"
-            results.append((price, name, link))
+                # Fallback: use the product-level price
+                try:
+                    price = float(prod.get("price", 0))
+                except Exception:
+                    continue
+                if price <= 0:
+                    continue
+                prod_is_foil = "foil" in name.lower()
+                if foil is True and not prod_is_foil:
+                    continue
+                if foil is False and prod_is_foil:
+                    continue
+                results.append((price, name, product_url))
 
         if not results:
             return 0.0, "Out of stock", ""
