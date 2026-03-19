@@ -39,32 +39,134 @@ def _find_matching_bracket(text, open_pos):
     n = len(text)
     if open_pos < 0 or open_pos >= n or text[open_pos] != "{":
         return -1
-    depth = 0; in_str = False; str_char = None; esc = False
+    depth = 0
+    in_str = False
+    str_char = None
+    esc = False
     for i in range(open_pos, n):
         ch = text[i]
-        if esc: esc = False; continue
-        if ch == "\\" and in_str: esc = True; continue
+        if esc:
+            esc = False
+            continue
+        if ch == "\\" and in_str:
+            esc = True
+            continue
         if ch in ('"', "'"):
-            if not in_str: in_str = True; str_char = ch
-            elif ch == str_char: in_str = False; str_char = None
+            if not in_str:
+                in_str = True
+                str_char = ch
+            elif ch == str_char:
+                in_str = False
+                str_char = None
             continue
         if not in_str:
-            if ch == "{": depth += 1
+            if ch == "{":
+                depth += 1
             elif ch == "}":
                 depth -= 1
-                if depth == 0: return i
+                if depth == 0:
+                    return i
     return -1
 
 
 def _parse_spurit_block(block):
-    """Parse a Spurit JS object (unquoted keys) into a dict."""
-    fixed = re.sub(r'([{,\s])([A-Za-z_]\w*)\s*:', r'\1"\2":', block)
-    fixed = re.sub(r":\s*'([^']*)'", r': "\1"', fixed)
+    result = []
+    i = 0
+    in_str = False
+    str_char = None
+    while i < len(block):
+        ch = block[i]
+        if in_str:
+            result.append(ch)
+            if ch == "\\":
+                i += 1
+                if i < len(block):
+                    result.append(block[i])
+            elif ch == str_char:
+                in_str = False
+            i += 1
+        else:
+            if ch in ('"', "'"):
+                in_str = True
+                str_char = ch
+                result.append('"')
+                i += 1
+            else:
+                km = re.match(r'([A-Za-z_]\w*)\s*:', block[i:])
+                if km and (not result or result[-1] in ('{', '[', ',', ' ', '\n', '\t')):
+                    result.append('"')
+                    result.append(km.group(1))
+                    result.append('":')
+                    i += len(km.group(0))
+                else:
+                    result.append(ch)
+                    i += 1
+    fixed = ''.join(result)
     fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
     try:
         return json.loads(fixed)
     except Exception:
         return None
+
+
+SPURIT_KEY = re.compile(
+    r"Spurit\.Preorder2\.snippet\.products\[['\"][^'\"]+['\"]\]\s*=\s*\{"
+)
+
+
+def _parse_all_spurit(page_text, target, target_set_name):
+    """
+    Parse all Spurit blocks matching target card name.
+    Returns (results_in_stock, matching_handles).
+    results_in_stock: list of (price, label, url) for in-stock NM variants
+    matching_handles: all handles that matched the card name (regardless of stock)
+    """
+    results = []
+    handles = set()
+
+    for m in SPURIT_KEY.finditer(page_text):
+        brace_pos = m.end() - 1
+        end_pos = _find_matching_bracket(page_text, brace_pos)
+        if end_pos == -1:
+            continue
+        block = page_text[brace_pos:end_pos + 1]
+        obj = _parse_spurit_block(block)
+        if not obj:
+            continue
+
+        title = obj.get("title", "")
+        base_title = re.sub(r"\(.*?\)", "", title.split("[")[0]).strip()
+        if target != _norm_gg(base_title):
+            continue
+
+        title_set = _get_set_from_title(title).lower()
+        if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
+            continue
+
+        handle = obj.get("handle", "")
+        if handle:
+            handles.add(handle)
+
+        for v in obj.get("variants", []):
+            qty = int(v.get("inventory_quantity", 0) or 0)
+            if qty <= 0:
+                continue
+            vtitle = v.get("title", "")
+            if "near mint" not in vtitle.lower():
+                continue
+            try:
+                price = float(v.get("price", 0)) / 100.0
+            except Exception:
+                continue
+            if price <= 0:
+                continue
+            vid = v.get("id")
+            product_url = f"https://tcg.goodgames.com.au/products/{handle}"
+            if vid:
+                product_url += f"?variant={vid}"
+            results.append((price, vtitle, f"{title} — {vtitle}", product_url))
+
+    return results, handles
 
 
 # ── GG Adelaide + Modbury ────────────────────────────────────────────────────
@@ -125,7 +227,10 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
     target_set_name = get_set_name(set_code).lower() if set_code else None
 
     query = quote_plus(card_name)
-    search_url = f"https://tcg.goodgames.com.au/search?q={query}&f_Product%20Type=mtg+single"
+    search_url = (
+        f"https://tcg.goodgames.com.au/search?q={query}"
+        f"&f_Product%20Type=mtg+single"
+    )
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
@@ -135,57 +240,59 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
         return 0.0, "Error", ""
 
     page_text = r.text
+
+    # Parse all matching Spurit blocks — get in-stock results AND all handles
+    all_variants, handles = _parse_all_spurit(page_text, target, target_set_name)
+
+    # Filter by foil preference
     results = []
-
-    # Parse Spurit blocks — these have inventory_quantity and are the ground truth
-    key_pattern = re.compile(
-        r"Spurit\.Preorder2\.snippet\.products\[['\"]([^'\"]+)['\"]\]\s*=\s*\{"
-    )
-    for m in key_pattern.finditer(page_text):
-        brace_pos = m.end() - 1  # position of the opening {
-        end_pos = _find_matching_bracket(page_text, brace_pos)
-        if end_pos == -1:
+    for price, vtitle, label, url in all_variants:
+        variant_is_foil = "foil" in vtitle.lower()
+        if foil is True and not variant_is_foil:
             continue
-        block = page_text[brace_pos:end_pos + 1]
-        obj = _parse_spurit_block(block)
-        if not obj:
+        if foil is False and variant_is_foil:
             continue
+        results.append((price, label, url))
 
-        title = obj.get("title", "")
-        base_title = re.sub(r"\(.*?\)", "", title.split("[")[0]).strip()
-        if target != _norm_gg(base_title):
+    print(f"[GGAus] spurit={len(results)} handles={handles} foil={foil} card={card_name!r}")
+
+    if results:
+        return min(results, key=lambda x: x[0])
+
+    # Fallback: fetch product.js for each matching handle to get full variant list
+    print(f"[GGAus] trying product.js fallback for {handles}")
+    for handle in handles:
+        try:
+            rp = requests.get(
+                f"https://tcg.goodgames.com.au/products/{handle}.js",
+                headers=headers, timeout=10
+            )
+            rp.raise_for_status()
+            pdata = rp.json()
+            prod_title = pdata.get("title", handle)
+            for v in pdata.get("variants", []):
+                if not v.get("available", False):
+                    continue
+                vtitle = v.get("title", "")
+                if "near mint" not in vtitle.lower():
+                    continue
+                variant_is_foil = "foil" in vtitle.lower()
+                if foil is True and not variant_is_foil:
+                    continue
+                if foil is False and variant_is_foil:
+                    continue
+                try:
+                    price = float(v.get("price", 0)) / 100.0
+                except Exception:
+                    continue
+                if price <= 0:
+                    continue
+                vid = v.get("id")
+                vurl = f"https://tcg.goodgames.com.au/products/{handle}?variant={vid}"
+                results.append((price, f"{prod_title} — {vtitle}", vurl))
+        except Exception as e:
+            print(f"[GGAus] product.js error for {handle}: {e}")
             continue
-
-        title_set = _get_set_from_title(title).lower()
-        if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
-            continue
-
-        handle = obj.get("handle", "")
-        for v in obj.get("variants", []):
-            qty = int(v.get("inventory_quantity", 0) or 0)
-            if qty <= 0:
-                continue
-            vtitle = v.get("title", "")
-            if "near mint" not in vtitle.lower():
-                continue
-            variant_is_foil = "foil" in vtitle.lower()
-            if foil is True and not variant_is_foil:
-                continue
-            if foil is False and variant_is_foil:
-                continue
-            try:
-                price = float(v.get("price", 0)) / 100.0
-            except Exception:
-                continue
-            if price <= 0:
-                continue
-            vid = v.get("id")
-            product_url = f"https://tcg.goodgames.com.au/products/{handle}"
-            if vid:
-                product_url += f"?variant={vid}"
-            results.append((price, f"{title} — {vtitle}", product_url))
-
-    print(f"[GGAus] spurit results={len(results)} for {card_name!r}")
 
     if not results:
         return 0.0, "Out of stock", ""
