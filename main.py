@@ -83,6 +83,9 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
                 futures[name] = ex.submit(fn, card_name,
                                           None, set_code, number,
                                           True if foil else (False if etched else None))
+            elif name in ("GGAdelaide", "GGModbury", "GGAustralia"):
+                futures[name] = ex.submit(fn, card_name, set_code, number,
+                                          True if foil else (False if etched else None))
             else:
                 futures[name] = ex.submit(fn, card_name)
 

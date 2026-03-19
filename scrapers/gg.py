@@ -4,21 +4,41 @@ import html as html_module
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus, urljoin
-from .utils import normalize
+from .utils import normalize, parse_card_query
+from .setnames import get_set_name
 
 
 def _extract_base_name(title):
-    title = title.split(" - ")[0]
-    title = re.sub(r"\[.*?\]", "", title)
-    title = re.sub(r"\(.*?\)", "", title)
+    """Extract card name from GG title format: 'Name (variant) [Set] - Condition'"""
+    title = title.split(" - ")[0]          # remove condition
+    title = re.sub(r"\[.*?\]", "", title)  # remove [Set Name]
+    title = re.sub(r"\(.*?\)", "", title)  # remove (variant)
     title = title.lower()
     title = re.sub(r"[^a-z0-9\s-]", "", title)
     title = re.sub(r"\s+", " ", title)
     return title.strip()
 
 
-def scrape_gg(card_name, base_url):
+def _is_foil_title(title: str) -> bool:
+    """Check if a GG title indicates a foil card."""
+    # Condition part is after the last ' - '
+    # e.g. 'Sol Ring [Set] - Near Mint Foil'
+    condition = title.split(" - ")[-1].lower()
+    return "foil" in condition
+
+
+def _get_set_from_title(title: str) -> str:
+    """Extract set name from GG title brackets."""
+    m = re.search(r"\[([^\]]+)\]", title)
+    return m.group(1).strip() if m else ""
+
+
+def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
     target = _extract_base_name(card_name)
+
+    # Resolve set name from code for matching
+    target_set_name = get_set_name(set_code).lower() if set_code else None
+
     query = quote_plus(f'{card_name} product_type:"mtg"')
     url = f"{base_url}/search?q={query}"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -37,12 +57,27 @@ def scrape_gg(card_name, base_url):
             full_title = match.group(1).strip() if match else "N/A"
 
             price_tag = div.find("p")
-            price_text = price_tag.get_text(strip=True) if price_tag else "N/A"
+            price_text = price_tag.get_text(strip=True) if price_tag else ""
             pm = re.search(r"\$([\d.,]+)", price_text)
             price = float(pm.group(1).replace(",", "")) if pm else 0.0
 
             if _extract_base_name(full_title) != target:
                 continue
+
+            title_is_foil = _is_foil_title(full_title)
+            title_set = _get_set_from_title(full_title).lower()
+
+            # Foil filter
+            if foil is True and not title_is_foil:
+                continue
+            if foil is False and title_is_foil:
+                continue
+
+            # Set filter (match on full set name)
+            if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
+                continue
+
+            # GG doesn't have collector numbers in titles, so skip number filter
 
             results.append((price, full_title, url))
 
@@ -53,12 +88,12 @@ def scrape_gg(card_name, base_url):
         return 0.0, "Error", ""
 
 
-def scrape_ggadelaide(card_name: str):
-    return scrape_gg(card_name, base_url="https://ggadelaide.com.au")
+def scrape_ggadelaide(card_name: str, set_code=None, number=None, foil=None):
+    return scrape_gg(card_name, "https://ggadelaide.com.au", set_code, number, foil)
 
 
-def scrape_ggmodbury(card_name: str):
-    return scrape_gg(card_name, base_url="https://ggmodbury.com.au")
+def scrape_ggmodbury(card_name: str, set_code=None, number=None, foil=None):
+    return scrape_gg(card_name, "https://ggmodbury.com.au", set_code, number, foil)
 
 
 def _find_matching_bracket(text: str, open_pos: int) -> int:
@@ -95,7 +130,7 @@ def _find_matching_bracket(text: str, open_pos: int) -> int:
     return -1
 
 
-def scrape_ggaustralia(card_name: str):
+def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
     def norm(text):
         text = html_module.unescape(text)
         text = text.lower()
@@ -113,6 +148,8 @@ def scrape_ggaustralia(card_name: str):
         return text.strip("-")
 
     target = norm(card_name)
+    target_set_name = get_set_name(set_code).lower() if set_code else None
+
     query = quote_plus(card_name)
     search_url = f"https://tcg.goodgames.com.au/search?q={query}&f_Product%20Type=mtg+single"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -121,7 +158,7 @@ def scrape_ggaustralia(card_name: str):
         r = requests.get(search_url, headers=headers, timeout=15)
         r.raise_for_status()
         page_text = r.text
-    except Exception as e:
+    except Exception:
         return 0.0, "Error", ""
 
     candidates = []
@@ -148,6 +185,11 @@ def scrape_ggaustralia(card_name: str):
         if target != norm(base_title):
             continue
 
+        # Set filter from title brackets
+        title_set = _get_set_from_title(title).lower()
+        if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
+            continue
+
         handle = obj.get("handle", "")
         for v in obj.get("variants", []):
             qty = int(v.get("inventory_quantity", 0) or 0)
@@ -160,13 +202,22 @@ def scrape_ggaustralia(card_name: str):
                 price = float(price_cents) / 100.0
             except Exception:
                 continue
-            if price > 0:
-                variant_title = v.get("title", "")
-                variant_id = v.get("id")
-                product_url = f"https://tcg.goodgames.com.au/products/{handle}"
-                if variant_id:
-                    product_url += f"?variant={variant_id}"
-                candidates.append((price, f"{title} — {variant_title}", product_url))
+            if price <= 0:
+                continue
+
+            variant_title = v.get("title", "").lower()
+            variant_is_foil = "foil" in variant_title
+
+            if foil is True and not variant_is_foil:
+                continue
+            if foil is False and variant_is_foil:
+                continue
+
+            variant_id = v.get("id")
+            product_url = f"https://tcg.goodgames.com.au/products/{handle}"
+            if variant_id:
+                product_url += f"?variant={variant_id}"
+            candidates.append((price, f"{title} — {v.get('title', '')}", product_url))
 
     if candidates:
         return min(candidates, key=lambda x: x[0])
@@ -187,12 +238,24 @@ def scrape_ggaustralia(card_name: str):
             base_name = name.split("[")[0].strip()
             if target != norm(base_name):
                 continue
+
+            title_set = _get_set_from_title(name).lower()
+            if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
+                continue
+
             try:
                 price = float(prod.get("price", 0))
             except Exception:
                 continue
             if price <= 0:
                 continue
+
+            prod_is_foil = "foil" in name.lower()
+            if foil is True and not prod_is_foil:
+                continue
+            if foil is False and prod_is_foil:
+                continue
+
             link = f"https://tcg.goodgames.com.au/products/{slugify(name)}"
             results.append((price, name, link))
 
