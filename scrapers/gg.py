@@ -140,7 +140,7 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
         if not title_tag:
             continue
         full_title = html_module.unescape(title_tag.get_text(strip=True))
-        base_title = full_title.split("[")[0].strip()
+        base_title = re.sub(r"\(.*?\)", "", full_title.split("[")[0]).strip()
         if target != _norm_gg(base_title):
             continue
 
@@ -199,7 +199,7 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
             continue
 
         title = obj.get("title", "")
-        base_title = title.split("[")[0].strip()
+        base_title = re.sub(r"\(.*?\)", "", title.split("[")[0]).strip()
         if target != _norm_gg(base_title):
             continue
 
