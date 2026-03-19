@@ -4,7 +4,6 @@ import html as html_module
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
-from .utils import normalize
 from .setnames import get_set_name
 
 
@@ -25,6 +24,15 @@ def _is_foil_title(title):
 def _get_set_from_title(title):
     m = re.search(r"\[([^\]]+)\]", title)
     return m.group(1).strip() if m else ""
+
+
+def _norm_gg(text):
+    text = html_module.unescape(text)
+    text = text.lower()
+    text = re.sub(r"[''`]", "", text)
+    text = re.sub(r"[^a-z0-9\s-]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
 
 def _find_matching_bracket(text, open_pos):
@@ -48,13 +56,15 @@ def _find_matching_bracket(text, open_pos):
     return -1
 
 
-def _norm_gg(text):
-    text = html_module.unescape(text)
-    text = text.lower()
-    text = re.sub(r"[''`]", "", text)
-    text = re.sub(r"[^a-z0-9\s-]", " ", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+def _parse_spurit_block(block):
+    """Parse a Spurit JS object (unquoted keys) into a dict."""
+    fixed = re.sub(r'([{,\s])([A-Za-z_]\w*)\s*:', r'\1"\2":', block)
+    fixed = re.sub(r":\s*'([^']*)'", r': "\1"', fixed)
+    fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
+    try:
+        return json.loads(fixed)
+    except Exception:
+        return None
 
 
 # ── GG Adelaide + Modbury ────────────────────────────────────────────────────
@@ -125,80 +135,35 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
         return 0.0, "Error", ""
 
     page_text = r.text
-    soup = BeautifulSoup(page_text, "html.parser")
     results = []
 
-    # Method 1: st-product HTML cards (server-rendered, reliable)
-    all_cards = soup.select("div.st-product")
-    print(f"[GGAus] page status={r.status_code} size={len(page_text)} st-product cards={len(all_cards)}")
-    for card in all_cards:
-        title_tag = card.select_one("div.product-title a span") or card.select_one("div.product-title a")
-        if not title_tag:
-            continue
-        full_title = html_module.unescape(title_tag.get_text(strip=True))
-        base_title = re.sub(r"\(.*?\)", "", full_title.split("[")[0]).strip()
-        print(f"[GGAus]   card: {full_title!r} base={base_title!r} target={target!r} match={target == _norm_gg(base_title)}")
-        if target != _norm_gg(base_title):
-            continue
-
-        set_tag = card.select_one("div.st-subtitle")
-        card_set = set_tag.get_text(strip=True).lower() if set_tag else _get_set_from_title(full_title).lower()
-        if target_set_name and target_set_name not in card_set and card_set not in target_set_name:
-            continue
-
-        # Foil: product-inner has "foiled" class, or title parenthetical contains "foil"
-        inner = card.select_one("div.product-inner")
-        inner_foiled = inner is not None and "foiled" in inner.get("class", [])
-        title_foiled = any("foil" in p.lower() for p in re.findall(r"\(([^)]+)\)", full_title))
-        card_is_foil = inner_foiled or title_foiled
-
-        if foil is True and not card_is_foil:
-            continue
-        if foil is False and card_is_foil:
-            continue
-
-        price_tag = card.select_one("div.product-prices.no-sale span")
-        if not price_tag:
-            continue
-        pm = re.search(r"\$([\d,]+\.?\d*)", price_tag.get_text())
-        if not pm:
-            continue
-        try:
-            price = float(pm.group(1).replace(",", ""))
-        except ValueError:
-            continue
-        if price <= 0:
-            continue
-
-        link_tag = card.select_one("div.product-title a")
-        href = link_tag.get("href", "") if link_tag else ""
-        if href and not href.startswith("http"):
-            href = "https://tcg.goodgames.com.au" + href
-        results.append((price, full_title, href))
-
-    if results:
-        return min(results, key=lambda x: x[0])
-
-    # Method 2: Spurit blocks (some cards use this)
+    # Parse Spurit blocks — these have inventory_quantity and are the ground truth
     key_pattern = re.compile(
-        r"Spurit\.Preorder2\.snippet\.products\[['\"][^'\"]+['\"]\]\s*=\s*"
-        r"(\{[^;]{1,20000}\})\s*;"
+        r"Spurit\.Preorder2\.snippet\.products\[['\"]([^'\"]+)['\"]\]\s*=\s*\{"
     )
     for m in key_pattern.finditer(page_text):
-        try:
-            obj = json.loads(m.group(1))
-        except Exception:
+        brace_pos = m.end() - 1  # position of the opening {
+        end_pos = _find_matching_bracket(page_text, brace_pos)
+        if end_pos == -1:
             continue
+        block = page_text[brace_pos:end_pos + 1]
+        obj = _parse_spurit_block(block)
+        if not obj:
+            continue
+
         title = obj.get("title", "")
         base_title = re.sub(r"\(.*?\)", "", title.split("[")[0]).strip()
         if target != _norm_gg(base_title):
             continue
+
         title_set = _get_set_from_title(title).lower()
         if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
             continue
+
         handle = obj.get("handle", "")
         for v in obj.get("variants", []):
-            if int(v.get("inventory_quantity", 0) or 0) <= 0:
+            qty = int(v.get("inventory_quantity", 0) or 0)
+            if qty <= 0:
                 continue
             vtitle = v.get("title", "")
             if "near mint" not in vtitle.lower():
@@ -219,6 +184,8 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
             if vid:
                 product_url += f"?variant={vid}"
             results.append((price, f"{title} — {vtitle}", product_url))
+
+    print(f"[GGAus] spurit results={len(results)} for {card_name!r}")
 
     if not results:
         return 0.0, "Out of stock", ""
