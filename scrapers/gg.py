@@ -173,6 +173,12 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
                     if foil is False and variant_is_foil:
                         continue
 
+                    # Only Near Mint (condition 1) — skip LP/MP/HP/Damaged
+                    if not variant_title.strip().endswith("1") and "near mint" not in variant_title.lower():
+                        # SKU condition: -NF-1 or -FO-1 means NM
+                        if not sku.endswith("-1"):
+                            continue
+
                     try:
                         price = float(v.get("price", 0)) / 100
                     except Exception:
@@ -185,6 +191,23 @@ def scrape_ggaustralia(card_name: str, set_code=None, number=None, foil=None):
                     results.append((price, f"{prod_title} — {variant_title}", vurl))
         except Exception:
             pass
+
+    # ── Build in-stock variant ID set from Spurit blocks ────────────────────
+    instock_ids = set()
+    key_pattern_spurit = re.compile(r"Spurit\.Preorder2\.snippet\.products\[['"]([^'"]+)['"]\]\s*=\s*(\{[^;]+\})\s*;")
+    for sm in key_pattern_spurit.finditer(page_text):
+        try:
+            obj = json.loads(sm.group(2))
+            for v in obj.get("variants", []):
+                if int(v.get("inventory_quantity", 0) or 0) > 0:
+                    instock_ids.add(v.get("id"))
+        except Exception:
+            pass
+
+    # Filter meta results to in-stock only (if we have Spurit data)
+    if instock_ids:
+        results = [(p, l, u) for p, l, u in results
+                   if any(str(vid) in u for vid in instock_ids)]
 
     if results:
         return min(results, key=lambda x: x[0])
