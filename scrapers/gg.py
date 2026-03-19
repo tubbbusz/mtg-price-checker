@@ -129,12 +129,15 @@ def scrape_ggaustralia(card_name, set_code=None, number=None, foil=None):
     results = []
 
     # Method 1: st-product HTML cards (server-rendered, reliable)
-    for card in soup.select("div.st-product"):
+    all_cards = soup.select("div.st-product")
+    print(f"[GGAus] page status={r.status_code} size={len(page_text)} st-product cards={len(all_cards)}")
+    for card in all_cards:
         title_tag = card.select_one("div.product-title a span") or card.select_one("div.product-title a")
         if not title_tag:
             continue
         full_title = html_module.unescape(title_tag.get_text(strip=True))
         base_title = re.sub(r"\(.*?\)", "", full_title.split("[")[0]).strip()
+        print(f"[GGAus]   card: {full_title!r} base={base_title!r} target={target!r} match={target == _norm_gg(base_title)}")
         if target != _norm_gg(base_title):
             continue
 
