@@ -79,10 +79,10 @@ def scrape_moonmtg(query: str):
         if number and v_num and v_num != number:
             continue
 
-        # Foil filter
+        # Foil filter: True=foil only, False=non-foil only, None=either
         if foil is True and not v_foil:
             continue
-        if (foil is False or foil is None) and v_foil:
+        if foil is False and v_foil:
             continue
 
         vid = v.get("id")

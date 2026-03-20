@@ -810,11 +810,17 @@ function renderRowCells(tr, data) {
   tr.innerHTML = '';
   const tdCard = document.createElement('td');
   tdCard.className = 'card-name';
-  const displayName = data.card.replace(/\b(\w)/g, (m, c, i, s) => {
-    // Don't capitalise articles/prepositions unless first word
-    const lower = ['a','an','the','of','in','on','at','to','and','or','but','for','nor','with','by','from'];
-    return (i === 0 || !lower.includes(m.toLowerCase())) ? m.toUpperCase() : m.toLowerCase();
-  });
+  // Title case: capitalise first letter of each word except conjunctions/prepositions
+  // But only apply to the card name part (before any set/number/foil indicators)
+  const lower_words = new Set(['a','an','the','of','in','on','at','to','and','or','but','for','nor','with','by','from']);
+  const displayName = data.card.split(' ').map((word, i) => {
+    // Don't transform set codes (all caps, 2-5 chars), numbers, or *F*/*E*
+    if (/^\*[A-Z]\*$/.test(word)) return word;           // *F* *E*
+    if (/^\([a-z0-9]+\)$/.test(word)) return word;        // (set) - keep lowercase
+    if (/^\d+[a-z]?$/.test(word)) return word;             // collector number
+    if (lower_words.has(word.toLowerCase()) && i > 0) return word.toLowerCase();
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
   tdCard.textContent = displayName; tdCard.title = data.card;
   tr.appendChild(tdCard);
 

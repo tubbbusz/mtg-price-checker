@@ -127,12 +127,14 @@ def scrape_hareruyamtg(card_name: str, language_filter: str = "EN",
         prod_name_has_foil = any(x in prod_name for x in ("foil", "promo", "prerelease", "serial", "galaxy", "retro"))
 
         # Foil filter
-        if foil is True:
-            if not item_is_foil:
-                continue
-        elif foil is False or foil is None:
-            if item_is_foil or prod_name_has_foil:
-                continue
+        # foil=True: only foil; foil=False: only non-foil; foil=None: either
+        if foil is True and not item_is_foil:
+            continue
+        if foil is False and (item_is_foil or prod_name_has_foil):
+            continue
+        # foil=None: exclude special foils (promo/serial etc) but allow regular foil
+        if foil is None and prod_name_has_foil and not item_is_foil:
+            continue
 
         # Parse set code and collector number from product_name
         # Format: "【EN】(316)■Showcase■《Sol Ring》[TLE]" or "[LCI-BF]" for borderless foil

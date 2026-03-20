@@ -224,8 +224,17 @@ async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False,
                 edition = card_data.get("edition", {})
                 set_code = edition.get("editioncode", "") if edition else ""
                 collector_number = card_data.get("collectorNumber", "")
-                foil_str = (card.get("finish") or card.get("modifier") or "").lower()
-                foil = foil_str in ("foil", "etched", "etched foil") or "foil" in foil_str
+                # Archidekt uses different field names across API versions
+                # Try all known locations for foil info
+                foil_str = (
+                    card.get("finish") or 
+                    card.get("modifier") or
+                    card_data.get("finish") or
+                    card_data.get("modifier") or
+                    ""
+                ).lower()
+                foil = "foil" in foil_str or foil_str in ("etched",)
+                print(f"[ARCH] {name} finish={card.get('finish')!r} modifier={card.get('modifier')!r} -> foil={foil}")
                 if name:
                     cards.append({
                         "qty": qty,
