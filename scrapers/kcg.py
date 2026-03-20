@@ -57,6 +57,7 @@ def scrape_kcg(card_name: str, set_code=None, number=None, foil=None):
             page_text, re.S
         )
         results = []
+        _product_cache = {}  # handle -> {variant_id: available}
         if meta_match:
             meta = json.loads(meta_match.group(1))
             for prod in meta.get("products", []):
@@ -95,12 +96,31 @@ def scrape_kcg(card_name: str, set_code=None, number=None, foil=None):
                     if foil is False and sku_foil:
                         continue
 
-                    # Stock check from HTML card (only for default variant)
+                    # Stock check — fetch product.js for accurate per-variant availability
                     vid = v.get("id")
                     if vid in prod_stock:
+                        # Default variant — use HTML card stock status
                         if not prod_stock[vid]:
                             continue
-                    # If not in prod_stock, we can't verify — include it optimistically
+                    else:
+                        # Non-default variant — need to fetch product.js
+                        # Cache fetches per handle to avoid repeated requests
+                        if handle not in _product_cache:
+                            try:
+                                rp = requests.get(
+                                    f"{BASE_URL}/products/{handle}.js",
+                                    headers=headers, timeout=10
+                                )
+                                rp.raise_for_status()
+                                pdata = rp.json()
+                                _product_cache[handle] = {
+                                    int(pv["id"]): pv.get("available", False)
+                                    for pv in pdata.get("variants", [])
+                                }
+                            except Exception:
+                                _product_cache[handle] = {}
+                        if not _product_cache[handle].get(int(vid), False):
+                            continue
 
                     try:
                         price = float(v.get("price", 0)) / 100
