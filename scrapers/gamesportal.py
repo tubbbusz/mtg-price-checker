@@ -22,9 +22,18 @@ def scrape_gamesportal(card_name: str, set_code=None, number=None, foil=None):
 
         # Primary: data-events with SKU
         m = re.search(r'data-events="([^"]+)"', page_text)
+        print(f"[GP] data-events found={m is not None} url={search_url}")
         if m:
             try:
-                events = json.loads(m.group(1).replace("&quot;", '"'))
+                raw = m.group(1).replace("&quot;", '"')
+                events = json.loads(raw)
+                print(f"[GP] events parsed ok, count={len(events)}")
+                for event in events:
+                    if len(event) >= 2 and isinstance(event[1], dict):
+                        variants = event[1].get("searchResult", {}).get("productVariants", [])
+                        print(f"[GP] variants in event: {len(variants)}")
+                        for v in variants[:2]:
+                            print(f"[GP]   title={v.get('product',{}).get('title','')!r} vendor={v.get('product',{}).get('vendor','')!r}")
                 for event in events:
                     if len(event) < 2 or not isinstance(event[1], dict):
                         continue
