@@ -164,18 +164,29 @@ async def search_stream(req: SearchRequest):
     loop = asyncio.get_event_loop()
 
     async def event_gen():
-        # Yield a "start" event so the client knows total count
         yield f"data: {json.dumps({'type': 'start', 'total': len(req.cards)})}\n\n"
-
-        for i, card in enumerate(req.cards, 1):
-            result = await loop.run_in_executor(
-                None, fetch_card, card, req.enabled_sources, req.hareruya_lang
-            )
-            payload = {"type": "result", "index": i, **result}
-            yield f"data: {json.dumps(payload)}\n\n"
-            await asyncio.sleep(5)  # rate limit: 5s between cards to avoid blocks
-
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        results_log = []
+        status = "aborted"
+        try:
+            for i, card in enumerate(req.cards, 1):
+                result = await loop.run_in_executor(
+                    None, fetch_card, card, req.enabled_sources, req.hareruya_lang
+                )
+                payload = {"type": "result", "index": i, **result}
+                yield f"data: {json.dumps(payload)}\n\n"
+                cheapest = result.get("cheapest_price", 0) or 0
+                cheapest_src = result.get("cheapest_source", "-")
+                results_log.append(f"  {card} -> ${cheapest:.2f} ({cheapest_src})")
+                await asyncio.sleep(5)
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            status = "COMPLETED"
+        except Exception:
+            status = "ABORTED"
+        finally:
+            if results_log:
+                print(f"[SEARCH {status}] {len(results_log)} cards:")
+                for entry in results_log:
+                    print(entry)
 
     return StreamingResponse(event_gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -207,10 +218,21 @@ async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False,
                     continue
                 if "sideboard" in categories and not include_sideboard:
                     continue
-                name = card.get("card", {}).get("oracleCard", {}).get("name", "")
+                card_data = card.get("card", {})
+                name = card_data.get("oracleCard", {}).get("name", "")
                 qty = card.get("quantity", 1)
+                edition = card_data.get("edition", {})
+                set_code = edition.get("editioncode", "") if edition else ""
+                collector_number = card_data.get("collectorNumber", "")
+                foil = card.get("finish", "").lower() in ("foil", "etched")
                 if name:
-                    cards.append({"qty": qty, "name": name})
+                    cards.append({
+                        "qty": qty,
+                        "name": name,
+                        "set_code": set_code.lower() if set_code else "",
+                        "collector_number": collector_number,
+                        "foil": foil,
+                    })
             return {"cards": cards}
         except Exception as e:
             return {"error": str(e)}
@@ -226,7 +248,7 @@ async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False,
                 continue
             if "maybeboard" in c.tags and not include_maybeboard:
                 continue
-            filtered.append({"qty": c.quantity, "name": c.name})
+            filtered.append({"qty": c.quantity, "name": c.name, "set_code": "", "collector_number": "", "foil": False})
         return {"cards": filtered}
     except Exception as e:
         return {"error": str(e)}

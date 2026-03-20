@@ -481,6 +481,18 @@
         <input type="text" id="url-input" placeholder="Paste deck URL..." />
         <button class="btn" id="btn-fetch-url">Fetch</button>
       </div>
+      <!-- Import options -->
+      <div class="setting-row" style="gap:8px;flex-wrap:wrap;font-size:11px;">
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" id="import-set" checked> Set code
+        </label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" id="import-num" checked> Collector #
+        </label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
+          <input type="checkbox" id="import-foil" checked> Foil
+        </label>
+      </div>
 
       <!-- Saved decks row -->
       <div class="saved-row">
@@ -795,7 +807,13 @@ function appendRow(data) {
 function renderRowCells(tr, data) {
   tr.innerHTML = '';
   const tdCard = document.createElement('td');
-  tdCard.className = 'card-name'; tdCard.textContent = data.card; tdCard.title = data.card;
+  tdCard.className = 'card-name';
+  const displayName = data.card.replace(/\b(\w)/g, (m, c, i, s) => {
+    // Don't capitalise articles/prepositions unless first word
+    const lower = ['a','an','the','of','in','on','at','to','and','or','but','for','nor','with','by','from'];
+    return (i === 0 || !lower.includes(m.toLowerCase())) ? m.toUpperCase() : m.toLowerCase();
+  });
+  tdCard.textContent = displayName; tdCard.title = data.card;
   tr.appendChild(tdCard);
 
   SOURCES.forEach(s => {
@@ -1002,7 +1020,16 @@ document.getElementById('btn-fetch-url').addEventListener('click', async () => {
     const res = await fetch(`/fetch-deck?url=${encodeURIComponent(url)}&include_sideboard=${sb}&include_maybeboard=${mb}`);
     const data = await res.json();
     if (data.error) { toast('Error: ' + data.error); return; }
-    document.getElementById('deck-input').value = data.cards.map(c => `${c.qty} ${c.name}`).join('\n');
+    const inclSet  = document.getElementById('import-set').checked;
+    const inclNum  = document.getElementById('import-num').checked;
+    const inclFoil = document.getElementById('import-foil').checked;
+    document.getElementById('deck-input').value = data.cards.map(c => {
+      let line = `${c.qty} ${c.name}`;
+      if (inclSet  && c.set_code)           line += ` (${c.set_code.toLowerCase()})`;
+      if (inclNum  && c.collector_number)   line += ` ${c.collector_number}`;
+      if (inclFoil && c.foil)              line += ` *F*`;
+      return line;
+    }).join('\n');
     setStatus(`Loaded ${data.cards.length} cards`);
   } catch (e) { toast('Failed to fetch deck: ' + e.message); }
 });
@@ -1061,7 +1088,9 @@ document.querySelectorAll('.menu-dropdown').forEach(d => {
 });
 
 // ── Zoom ──────────────────────────────────────────────────
+let currentZoom = 100;
 function setZoom(pct) {
+  currentZoom = pct;
   currentZoom = pct;
   document.body.style.zoom = pct + '%';
   // Update checkmarks
@@ -1124,6 +1153,55 @@ document.getElementById('menu-about').addEventListener('click', () => {
 // ── Startup ───────────────────────────────────────────────
 init();
 setZoom(100);
+
+// ── Persist user preferences ──────────────────────────────
+const PREFS_KEY = 'sma_prefs';
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    // Zoom
+    if (p.zoom) setZoom(p.zoom);
+    // Hareruya lang
+    if (p.harLang) document.getElementById('hareruya-lang').value = p.harLang;
+    // Import options
+    if (p.importSet  !== undefined) document.getElementById('import-set').checked  = p.importSet;
+    if (p.importNum  !== undefined) document.getElementById('import-num').checked  = p.importNum;
+    if (p.importFoil !== undefined) document.getElementById('import-foil').checked = p.importFoil;
+    // Sideboard/maybeboard
+    if (p.sideboard  !== undefined) document.getElementById('cb-sideboard').checked  = p.sideboard;
+    if (p.maybeboard !== undefined) document.getElementById('cb-maybeboard').checked = p.maybeboard;
+    // Sources
+    if (p.sources) {
+      SOURCES.forEach(s => {
+        const enabled = p.sources.includes(s);
+        const cb = document.querySelector(`input[data-src="${s}"]`);
+        if (cb) { cb.checked = enabled; if (enabled) enabledSources.add(s); else enabledSources.delete(s); }
+      });
+    }
+  } catch(e) {}
+}
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
+      zoom: currentZoom,
+      harLang: document.getElementById('hareruya-lang').value,
+      importSet:  document.getElementById('import-set').checked,
+      importNum:  document.getElementById('import-num').checked,
+      importFoil: document.getElementById('import-foil').checked,
+      sideboard:  document.getElementById('cb-sideboard').checked,
+      maybeboard: document.getElementById('cb-maybeboard').checked,
+      sources: [...enabledSources],
+    }));
+  } catch(e) {}
+}
+// Save on any change
+['hareruya-lang','import-set','import-num','import-foil','cb-sideboard','cb-maybeboard'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', savePrefs);
+});
+document.querySelectorAll('#source-grid input[type=checkbox]').forEach(cb => cb.addEventListener('change', savePrefs));
+// Save on zoom change
+document.querySelectorAll('.zoom-entry').forEach(el => el.addEventListener('click', savePrefs));
+loadPrefs();
 </script>
 </body>
 </html>
