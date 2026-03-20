@@ -89,7 +89,9 @@ def scrape_cardhub(card_name: str, set_code=None, number=None, foil=None):
                     continue
                 if price <= 0:
                     continue
-                results.append((price, f"{prod_title} — {vtitle}", prod_url or url))
+                vid = v.get("id")
+                vurl = f"{prod_url}?variant={vid}" if prod_url and vid else (prod_url or url)
+                results.append((price, f"{prod_title} — {vtitle}", vurl))
 
         if not results:
             return 0.0, "Out of stock", ""
