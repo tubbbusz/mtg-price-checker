@@ -72,8 +72,10 @@ def scrape_cardhub(card_name: str, set_code=None, number=None, foil=None):
             except Exception:
                 pass
 
+        print(f"[CH] data-events results={len(results)} target={target!r}")
         if not results:
             return 0.0, "Out of stock", ""
         return min(results, key=lambda x: x[0])
-    except Exception:
+    except Exception as e:
+        print(f"[CH] exception: {e}")
         return 0.0, "Error", ""

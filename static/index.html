@@ -445,9 +445,9 @@
     <u>V</u>iew
     <div class="menu-dropdown">
       <div class="menu-entry disabled" style="font-size:10px;color:#444;padding-bottom:2px">Zoom</div>
-      <div class="menu-entry zoom-entry" data-zoom="100">100% (Normal)</div>
+      <div class="menu-entry zoom-entry checked" data-zoom="100">100% (Normal)</div>
       <div class="menu-entry zoom-entry" data-zoom="125">125%</div>
-      <div class="menu-entry zoom-entry checked" data-zoom="133">133%</div>
+      <div class="menu-entry zoom-entry" data-zoom="133">133%</div>
       <div class="menu-entry zoom-entry" data-zoom="150">150%</div>
       <div class="menu-entry zoom-entry" data-zoom="175">175%</div>
       <div class="menu-entry zoom-entry" data-zoom="200">200%</div>
@@ -917,19 +917,39 @@ function hideCtx() { document.getElementById('ctx-menu').classList.remove('open'
 document.addEventListener('click', hideCtx);
 
 // ── Open All ─────────────────────────────────────────────
+// Open All — uses a queue opened one per click to bypass popup blocker
+let _openQueue = [];
+let _openBtn = null;
+
 document.getElementById('btn-open-all').addEventListener('click', () => {
-  const urls = rows.map(r => r.cheapest_url).filter(Boolean);
-  if (!urls.length) { toast('No results yet'); return; }
-  // Open one tab at a time with a 500ms gap to avoid popup blocker
-  let i = 0;
-  function openNext() {
-    if (i >= urls.length) { toast(`Opened ${urls.length} tabs`); return; }
-    window.open(urls[i], '_blank');
-    i++;
-    setTimeout(openNext, 500);
+  // If queue is running, open the next one
+  if (_openQueue.length > 0) {
+    const url = _openQueue.shift();
+    window.open(url, '_blank');
+    const remaining = _openQueue.length;
+    if (remaining > 0) {
+      toast(`Click again to open next (${remaining} remaining)`);
+    } else {
+      toast('All tabs opened!');
+      document.getElementById('btn-open-all').textContent = 'Open All Cheapest';
+    }
+    return;
   }
-  openNext();
-  toast(`Opening tab 1 of ${urls.length}...`);
+
+  // Start fresh queue
+  _openQueue = rows.map(r => r.cheapest_url).filter(Boolean);
+  if (!_openQueue.length) { toast('No results yet'); return; }
+
+  // Open the first one immediately (this click counts as user action)
+  const first = _openQueue.shift();
+  window.open(first, '_blank');
+  const remaining = _openQueue.length;
+  if (remaining > 0) {
+    document.getElementById('btn-open-all').textContent = `Open Next (${remaining} left)`;
+    toast(`Click again to open next (${remaining} remaining)`);
+  } else {
+    toast('All tabs opened!');
+  }
 });
 
 // ── Export CSV ───────────────────────────────────────────
@@ -1103,7 +1123,7 @@ document.getElementById('menu-about').addEventListener('click', () => {
 
 // ── Startup ───────────────────────────────────────────────
 init();
-setZoom(133);
+setZoom(100);
 </script>
 </body>
 </html>
