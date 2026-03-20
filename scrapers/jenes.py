@@ -1,52 +1,102 @@
 import re
+import json
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
+from .gg import _extract_base_name
+from .setnames import get_set_name
 
 
-def scrape_jenes(card_name: str):
-    url = f"https://jenesmtg.com.au/search?q={quote_plus(card_name)}&options%5Bprefix%5D=last"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+def scrape_jenesmtg(card_name: str, set_code=None, number=None, foil=None):
+    """
+    JenesMTG uses ShopifyAnalytics.meta with variant name format:
+    "Card Name|Set Name|Collector Number"
+    One variant per product (NM only). Foil products have "foil" in handle.
+    """
+    target = _extract_base_name(card_name)
+    target_set_name = get_set_name(set_code).lower() if set_code else None
+    base_url = "https://jenesmtg.com.au"
+    query = quote_plus(card_name)
+    search_url = f"{base_url}/search?type=product&q={query}"
+    headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        target = card_name.strip().lower()
+        r = requests.get(search_url, headers=headers, timeout=15)
+        r.raise_for_status()
+        page_text = r.text
         results = []
 
-        for card in soup.select("div.mtg-card"):
-            stock_badge = card.select_one("span.mtg-stock-badge")
-            if not stock_badge or "in-stock" not in stock_badge.get("class", []):
-                continue
+        # Parse ShopifyAnalytics.meta
+        meta_match = re.search(
+            r'var meta\s*=\s*(\{"products"\s*:.*?\})\s*;',
+            page_text, re.S
+        )
+        if meta_match:
+            try:
+                meta = json.loads(meta_match.group(1))
+                for prod in meta.get("products", []):
+                    handle = prod.get("handle", "")
 
-            name_tag = card.select_one("a.mtg-card-name")
-            if not name_tag:
-                continue
+                    for v in prod.get("variants", []):
+                        raw_name = v.get("name", "")
+                        sku = v.get("sku", "")
 
-            title_attr = name_tag.get("title", "")
-            card_title = title_attr.split("|")[0].strip() if title_attr else name_tag.get_text(strip=True)
-            if card_title.lower() != target:
-                continue
+                        # Foil detection:
+                        # 1. SKU ends in FOIL
+                        # 2. Handle starts with foil-
+                        # 3. Title has "| ... Foil" suffix
+                        prod_is_foil = (
+                            sku.upper().endswith("FOIL") or
+                            handle.lower().startswith("foil-") or
+                            bool(re.search(r"\|\s*\w*\s*foil\s*$", raw_name, re.I))
+                        )
+                        if foil is True and not prod_is_foil:
+                            continue
+                        if foil is False and prod_is_foil:
+                            continue
 
-            link = name_tag.get("href", "").split("?")[0]
-            if link and not link.startswith("http"):
-                link = "https://jenesmtg.com.au" + link
+                        # Format: "Card Name|Set Name|Collector Number" or
+                        #         "Card Name|Set Name|Number | Foil Type"
+                        # Strip foil type suffix before splitting
+                        clean_name = re.sub(r"\s*\|\s*\w[\w\s]*foil\s*$", "", raw_name, flags=re.I)
+                        parts = clean_name.split("|")
+                        if len(parts) < 1:
+                            continue
 
-            price_tag = card.select_one("span.mtg-card-price")
-            if not price_tag:
-                continue
-            match = re.search(r"\$([0-9]+\.[0-9]{2})", price_tag.get_text(strip=True))
-            if not match:
-                continue
+                        v_card = parts[0].strip()
+                        v_set = parts[1].strip().lower() if len(parts) > 1 else ""
+                        v_num = parts[2].strip() if len(parts) > 2 else ""
 
-            price = float(match.group(1))
-            label = title_attr if title_attr else card_title
-            results.append((price, label, link))
+                        if _extract_base_name(v_card) != target:
+                            continue
+
+                        # Set filter
+                        if target_set_name:
+                            if target_set_name not in v_set and v_set not in target_set_name:
+                                continue
+
+                        # Number filter
+                        if number and v_num and v_num != number:
+                            continue
+
+                        try:
+                            price = float(v.get("price", 0)) / 100
+                        except Exception:
+                            continue
+                        if price <= 0:
+                            continue
+
+                        vid = v.get("id")
+                        prod_url = f"{base_url}/products/{handle}?variant={vid}" if vid else f"{base_url}/products/{handle}"
+                        label = f"{v_card} [{parts[1].strip() if len(parts) > 1 else ''}]"
+                        if v_num:
+                            label += f" #{v_num}"
+                        results.append((price, label, prod_url))
+            except Exception as e:
+                pass
 
         if not results:
-            return (0.0, "Out of stock", "")
+            return 0.0, "Out of stock", ""
         return min(results, key=lambda x: x[0])
-    except Exception as e:
-        return (0.0, "Error", "")
+    except Exception:
+        return 0.0, "Error", ""
