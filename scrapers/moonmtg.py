@@ -1,5 +1,6 @@
 import re
 import requests
+from bs4 import BeautifulSoup
 from .utils import parse_card_query
 
 BASE_URL = "https://moonmtg.com/products/"
@@ -14,10 +15,7 @@ def _make_handle(card_name: str) -> str:
 
 
 def _parse_public_title(title: str):
-    """
-    Parse MoonMTG variant public_title like "SLD 606 Foil" or "FIC 361"
-    Returns (set_code, number, is_foil)
-    """
+    """Parse "SLD 606 Foil" -> (set_code, number, is_foil)"""
     parts = title.strip().split()
     set_code = parts[0].upper() if parts else ""
     number = parts[1] if len(parts) > 1 else ""
@@ -25,11 +23,31 @@ def _parse_public_title(title: str):
     return set_code, number, is_foil
 
 
+def _check_variant_stock(handle: str, vid) -> bool:
+    """Check if a specific variant is in stock via its product page."""
+    try:
+        r = requests.get(f"{BASE_URL}{handle}?variant={vid}", timeout=10)
+        if r.status_code != 200:
+            return False
+        soup = BeautifulSoup(r.text, "html.parser")
+        inv = soup.find("p", class_="product__inventory")
+        if inv:
+            text = inv.get_text(strip=True)
+            return text not in ("Out of stock", "Sold out")
+        # Also check add to cart button
+        btn = soup.select_one("button[name='add']")
+        if btn:
+            return not btn.has_attr("disabled")
+        return True  # optimistic if no indicator found
+    except Exception:
+        return False
+
+
 def scrape_moonmtg(query: str):
     card_name, set_code, number, foil, etched = parse_card_query(query)
     handle = _make_handle(card_name)
 
-    # Fetch product JSON — has all variants with availability
+    # Fetch product JSON
     try:
         r = requests.get(f"{BASE_URL}{handle}.json", timeout=15)
         if r.status_code != 200:
@@ -39,17 +57,15 @@ def scrape_moonmtg(query: str):
         return (0.0, "Error", "")
 
     variants = product.get("variants", [])
-    results = []
+    candidates = []
 
     for v in variants:
-        if not v.get("available", False):
-            continue
-
-        public_title = v.get("option1", "") or v.get("title", "")
+        public_title = v.get("option1") or v.get("title", "")
         v_set, v_num, v_foil = _parse_public_title(public_title)
 
+        # Price — .json returns as string e.g. "45.40"
         try:
-            price = float(v.get("price", 0)) / 100
+            price = float(v.get("price", 0))
         except Exception:
             continue
         if price <= 0:
@@ -72,8 +88,19 @@ def scrape_moonmtg(query: str):
         vid = v.get("id")
         url = f"{BASE_URL}{handle}?variant={vid}"
         label = v.get("name", f"{card_name} - {public_title}")
-        results.append((price, label, url))
 
-    if results:
-        return min(results, key=lambda x: x[0])
+        # Check availability
+        # .json has 'available' field on Shopify — use it if present
+        available = v.get("available")
+        if available is False:
+            continue
+        elif available is None:
+            # Not in .json — check variant page (slow but accurate)
+            if not _check_variant_stock(handle, vid):
+                continue
+
+        candidates.append((price, label, url))
+
+    if candidates:
+        return min(candidates, key=lambda x: x[0])
     return (0.0, "Out of stock", "")
