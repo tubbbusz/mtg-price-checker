@@ -1,77 +1,79 @@
 import re
 import requests
-from bs4 import BeautifulSoup
 from .utils import parse_card_query
+
+BASE_URL = "https://moonmtg.com/products/"
+
+
+def _make_handle(card_name: str) -> str:
+    h = card_name.lower()
+    h = re.sub(r"[''\":,?!()]", "", h)
+    h = re.sub(r"[^a-z0-9\s-]", "", h)
+    h = re.sub(r"\s+", "-", h)
+    return h.strip("-")
+
+
+def _parse_public_title(title: str):
+    """
+    Parse MoonMTG variant public_title like "SLD 606 Foil" or "FIC 361"
+    Returns (set_code, number, is_foil)
+    """
+    parts = title.strip().split()
+    set_code = parts[0].upper() if parts else ""
+    number = parts[1] if len(parts) > 1 else ""
+    is_foil = "foil" in title.lower()
+    return set_code, number, is_foil
 
 
 def scrape_moonmtg(query: str):
-    BASE_URL = "https://moonmtg.com/products/"
     card_name, set_code, number, foil, etched = parse_card_query(query)
+    handle = _make_handle(card_name)
 
-    handle = card_name.lower()
-    handle = re.sub(r"[''\":,?!()]", "", handle)
-    handle = re.sub(r"[^a-z0-9\s-]", "", handle)
-    handle = re.sub(r"\s+", "-", handle)
-    handle = handle.strip("-")
-
-    def normalize_variant_title(title: str) -> str:
-        t = title.upper()
-        t = re.sub(r"\[.*?\]", "", t)
-        t = re.sub(r"\(.*?\)", "", t)
-        return t.strip()
-
+    # Fetch product JSON — has all variants with availability
     try:
         r = requests.get(f"{BASE_URL}{handle}.json", timeout=15)
         if r.status_code != 200:
             return (0.0, "Not found", "")
         product = r.json().get("product", {})
     except Exception:
-        return (0.0, "Not found", "")
+        return (0.0, "Error", "")
 
     variants = product.get("variants", [])
-    matches = []
+    results = []
 
     for v in variants:
-        title = v.get("title", "").upper()
-        normalized = normalize_variant_title(title)
-        vid = v.get("id")
+        if not v.get("available", False):
+            continue
+
+        public_title = v.get("option1", "") or v.get("title", "")
+        v_set, v_num, v_foil = _parse_public_title(public_title)
+
         try:
-            price = float(v.get("price", 0))
+            price = float(v.get("price", 0)) / 100
         except Exception:
-            price = 0.0
+            continue
         if price <= 0:
             continue
 
-        try:
-            s = requests.get(f"{BASE_URL}{handle}?variant={vid}", timeout=15)
-            if s.status_code != 200:
-                continue
-            soup = BeautifulSoup(s.text, "html.parser")
-            inv = soup.find("p", class_="product__inventory")
-            stock_status = inv.get_text(strip=True) if inv else "Unknown"
-            if stock_status in ["Out of stock", "Unknown", "Stock info not found"]:
-                continue
-        except Exception:
+        # Set filter
+        if set_code and v_set and v_set.lower() != set_code.lower():
             continue
 
+        # Number filter
+        if number and v_num and v_num != number:
+            continue
+
+        # Foil filter
+        if foil is True and not v_foil:
+            continue
+        if (foil is False or foil is None) and v_foil:
+            continue
+
+        vid = v.get("id")
         url = f"{BASE_URL}{handle}?variant={vid}"
+        label = v.get("name", f"{card_name} - {public_title}")
+        results.append((price, label, url))
 
-        if set_code and number:
-            if normalized.startswith(f"{set_code} {number}") or normalized.startswith(f"{set_code}-{number}"):
-                if foil and "FOIL" not in title:
-                    continue
-                if etched and "ETCHED" not in title:
-                    continue
-                return (price, title, url)
-        elif set_code and normalized.startswith(set_code):
-            if foil and "FOIL" not in title:
-                continue
-            if etched and "ETCHED" not in title:
-                continue
-            matches.append((price, title, url))
-        elif not set_code:
-            matches.append((price, title, url))
-
-    if matches:
-        return min(matches, key=lambda x: x[0])
-    return (0.0, "Not found", "")
+    if results:
+        return min(results, key=lambda x: x[0])
+    return (0.0, "Out of stock", "")

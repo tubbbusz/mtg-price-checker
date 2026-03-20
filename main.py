@@ -89,6 +89,9 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
                            "GamesPortal", "CardHub", "JenesMTG", "KCG"):
                 futures[name] = ex.submit(fn, card_name, set_code, number,
                                           True if foil else (False if etched else None))
+            elif name == "MoonMTG":
+                # MoonMTG parses the raw query internally
+                futures[name] = ex.submit(fn, card)
             else:
                 futures[name] = ex.submit(fn, card_name)
 
