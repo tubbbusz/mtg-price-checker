@@ -141,7 +141,7 @@ def scrape_hareruyamtg(card_name: str, language_filter: str = "EN",
         item_num_match = _re.search(r'\((\d+)\)', raw_name)
         item_number = item_num_match.group(1) if item_num_match else None
         # Set code may have suffix like -BF (borderless foil), -EA (extended art) etc
-        item_set_match = _re.search(r'\[([A-Z0-9]{2,6})(?:-[A-Z]{1,4})?\]', raw_name)
+        item_set_match = _re.search(r'\[([A-Z0-9]{2,6})(?:-[A-Z0-9]{1,5})?\]', raw_name)
         item_set_code = item_set_match.group(1).lower() if item_set_match else None
 
         # Set filter — prefer set code match, fall back to name match

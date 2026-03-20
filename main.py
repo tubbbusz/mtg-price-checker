@@ -224,7 +224,8 @@ async def fetch_deck_url(url: str = Query(...), include_sideboard: bool = False,
                 edition = card_data.get("edition", {})
                 set_code = edition.get("editioncode", "") if edition else ""
                 collector_number = card_data.get("collectorNumber", "")
-                foil = card.get("finish", "").lower() in ("foil", "etched")
+                foil_str = (card.get("finish") or card.get("modifier") or "").lower()
+                foil = foil_str in ("foil", "etched", "etched foil") or "foil" in foil_str
                 if name:
                     cards.append({
                         "qty": qty,
