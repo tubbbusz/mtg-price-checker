@@ -135,12 +135,13 @@ def scrape_hareruyamtg(card_name: str, language_filter: str = "EN",
                 continue
 
         # Parse set code and collector number from product_name
-        # Format: "【EN】(316)■Showcase■《Sol Ring》[TLE]"
+        # Format: "【EN】(316)■Showcase■《Sol Ring》[TLE]" or "[LCI-BF]" for borderless foil
         import re as _re
         raw_name = item.get("product_name_en") or item.get("product_name") or ""
         item_num_match = _re.search(r'\((\d+)\)', raw_name)
         item_number = item_num_match.group(1) if item_num_match else None
-        item_set_match = _re.search(r'\[([A-Z0-9]{2,6})\]', raw_name)
+        # Set code may have suffix like -BF (borderless foil), -EA (extended art) etc
+        item_set_match = _re.search(r'\[([A-Z0-9]{2,6})(?:-[A-Z]{1,4})?\]', raw_name)
         item_set_code = item_set_match.group(1).lower() if item_set_match else None
 
         # Set filter — prefer set code match, fall back to name match

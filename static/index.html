@@ -481,17 +481,23 @@
         <input type="text" id="url-input" placeholder="Paste deck URL..." />
         <button class="btn" id="btn-fetch-url">Fetch</button>
       </div>
-      <!-- Import options -->
-      <div class="setting-row" style="gap:8px;flex-wrap:wrap;font-size:11px;">
-        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
-          <input type="checkbox" id="import-set" checked> Set code
-        </label>
-        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
-          <input type="checkbox" id="import-num" checked> Collector #
-        </label>
-        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
-          <input type="checkbox" id="import-foil" checked> Foil
-        </label>
+      <!-- Import options dropdown -->
+      <div class="url-row" style="position:relative;">
+        <div id="import-opts-btn" class="btn" style="width:100%;text-align:left;cursor:pointer;" onclick="event.stopPropagation();var p=document.getElementById('import-opts-panel');p.style.display=p.style.display==='block'?'none':'block'">
+          Import options &#9660;
+        </div>
+        <div id="import-opts-panel" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:300;background:#c0c0c0;border:2px inset #808080;padding:4px 8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;">
+            <span style="cursor:pointer;text-decoration:underline;" onclick="['import-set','import-num','import-foil','import-sb','import-mb'].forEach(id=>document.getElementById(id).checked=true);savePrefs()">Check all</span>
+            <span style="cursor:pointer;text-decoration:underline;" onclick="['import-set','import-num','import-foil','import-sb','import-mb'].forEach(id=>document.getElementById(id).checked=false);savePrefs()">Uncheck all</span>
+          </div>
+          <label class="setting-row" style="cursor:pointer;"><span>Include set code</span><input type="checkbox" id="import-set" checked onchange="savePrefs()"></label>
+          <label class="setting-row" style="cursor:pointer;"><span>Include collector number</span><input type="checkbox" id="import-num" checked onchange="savePrefs()"></label>
+          <label class="setting-row" style="cursor:pointer;"><span>Include foil indicator</span><input type="checkbox" id="import-foil" checked onchange="savePrefs()"></label>
+          <hr style="margin:4px 0;border-color:#808080;">
+          <label class="setting-row" style="cursor:pointer;"><span>Include sideboard</span><input type="checkbox" id="import-sb" onchange="savePrefs()"></label>
+          <label class="setting-row" style="cursor:pointer;"><span>Include maybeboard</span><input type="checkbox" id="import-mb" onchange="savePrefs()"></label>
+        </div>
       </div>
 
       <!-- Saved decks row -->
@@ -526,14 +532,6 @@
           <option value="Other">Other</option>
           <option value="All">All</option>
         </select>
-      </div>
-      <div class="setting-row">
-        <label for="cb-sideboard">Include Sideboard</label>
-        <input type="checkbox" id="cb-sideboard" />
-      </div>
-      <div class="setting-row">
-        <label for="cb-maybeboard">Include Maybeboard</label>
-        <input type="checkbox" id="cb-maybeboard" />
       </div>
     </div>
 
@@ -690,6 +688,10 @@ async function init() {
   buildTableHeaders();
   pollCKStatus();
   refreshDeckDropdown();
+
+  // Apply saved source preferences after grid is built
+  loadPrefs(true);
+  document.querySelectorAll('#source-grid input[type=checkbox]').forEach(cb => cb.addEventListener('change', savePrefs));
 }
 
 function buildTableHeaders() {
@@ -1015,8 +1017,8 @@ document.getElementById('btn-fetch-url').addEventListener('click', async () => {
   const url = document.getElementById('url-input').value.trim(); if (!url) return;
   setStatus('Fetching deck...');
   try {
-    const sb = document.getElementById('cb-sideboard').checked;
-    const mb = document.getElementById('cb-maybeboard').checked;
+    const sb = document.getElementById('import-sb')?.checked || document.getElementById('cb-sideboard')?.checked || false;
+    const mb = document.getElementById('import-mb')?.checked || document.getElementById('cb-maybeboard')?.checked || false;
     const res = await fetch(`/fetch-deck?url=${encodeURIComponent(url)}&include_sideboard=${sb}&include_maybeboard=${mb}`);
     const data = await res.json();
     if (data.error) { toast('Error: ' + data.error); return; }
@@ -1056,7 +1058,7 @@ function toast(msg) {
 }
 
 // ── Menubar ───────────────────────────────────────────────
-let currentZoom = 133;
+let currentZoom = 100;
 let sidebarVisible = true;
 
 // Open/close menus on click
@@ -1080,7 +1082,9 @@ document.querySelectorAll('.menu-item').forEach(item => {
 // Close on outside click
 document.addEventListener('click', () => {
   document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+  document.getElementById('import-opts-panel').style.display = 'none';
 });
+document.getElementById('import-opts-panel')?.addEventListener('click', e => e.stopPropagation());
 
 // Prevent dropdown clicks from closing the menu immediately
 document.querySelectorAll('.menu-dropdown').forEach(d => {
@@ -1088,9 +1092,7 @@ document.querySelectorAll('.menu-dropdown').forEach(d => {
 });
 
 // ── Zoom ──────────────────────────────────────────────────
-let currentZoom = 100;
 function setZoom(pct) {
-  currentZoom = pct;
   currentZoom = pct;
   document.body.style.zoom = pct + '%';
   // Update checkmarks
@@ -1151,27 +1153,19 @@ document.getElementById('menu-about').addEventListener('click', () => {
 });
 
 // ── Startup ───────────────────────────────────────────────
-init();
-setZoom(100);
-
 // ── Persist user preferences ──────────────────────────────
 const PREFS_KEY = 'sma_prefs';
-function loadPrefs() {
+function loadPrefs(applySourcesToo) {
   try {
     const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
-    // Zoom
     if (p.zoom) setZoom(p.zoom);
-    // Hareruya lang
     if (p.harLang) document.getElementById('hareruya-lang').value = p.harLang;
-    // Import options
     if (p.importSet  !== undefined) document.getElementById('import-set').checked  = p.importSet;
     if (p.importNum  !== undefined) document.getElementById('import-num').checked  = p.importNum;
     if (p.importFoil !== undefined) document.getElementById('import-foil').checked = p.importFoil;
-    // Sideboard/maybeboard
-    if (p.sideboard  !== undefined) document.getElementById('cb-sideboard').checked  = p.sideboard;
-    if (p.maybeboard !== undefined) document.getElementById('cb-maybeboard').checked = p.maybeboard;
-    // Sources
-    if (p.sources) {
+    if (p.importSb   !== undefined) document.getElementById('import-sb').checked   = p.importSb;
+    if (p.importMb   !== undefined) document.getElementById('import-mb').checked   = p.importMb;
+    if (applySourcesToo && p.sources) {
       SOURCES.forEach(s => {
         const enabled = p.sources.includes(s);
         const cb = document.querySelector(`input[data-src="${s}"]`);
@@ -1188,20 +1182,21 @@ function savePrefs() {
       importSet:  document.getElementById('import-set').checked,
       importNum:  document.getElementById('import-num').checked,
       importFoil: document.getElementById('import-foil').checked,
-      sideboard:  document.getElementById('cb-sideboard').checked,
-      maybeboard: document.getElementById('cb-maybeboard').checked,
+      importSb:   document.getElementById('import-sb')?.checked || false,
+      importMb:   document.getElementById('import-mb')?.checked || false,
       sources: [...enabledSources],
     }));
   } catch(e) {}
 }
-// Save on any change
-['hareruya-lang','import-set','import-num','import-foil','cb-sideboard','cb-maybeboard'].forEach(id => {
+['hareruya-lang','import-set','import-num','import-foil','import-sb','import-mb'].forEach(id => {
   document.getElementById(id)?.addEventListener('change', savePrefs);
 });
-document.querySelectorAll('#source-grid input[type=checkbox]').forEach(cb => cb.addEventListener('change', savePrefs));
-// Save on zoom change
 document.querySelectorAll('.zoom-entry').forEach(el => el.addEventListener('click', savePrefs));
-loadPrefs();
+
+// Load non-source prefs immediately (sources loaded after init)
+loadPrefs(false);
+setZoom(currentZoom);
+init();
 </script>
 </body>
 </html>
