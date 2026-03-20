@@ -81,7 +81,11 @@ def _scrape_conditions_from_page(product_id: str, base_label: str, product_url: 
     return entries
 
 
-def scrape_hareruyamtg(card_name: str, language_filter: str = "EN") -> tuple:
+def scrape_hareruyamtg(card_name: str, language_filter: str = "EN",
+                       set_code: str = None, number: str = None, foil: bool = None) -> tuple:
+    from .setnames import get_set_name
+    target_set_name = get_set_name(set_code).lower() if set_code else None
+
     base_url = "https://www.hareruyamtg.com/en/products/search/unisearch_api"
     params = {"kw": card_name, "fq.price": "1~*", "rows": 60, "page": 1, "user": HARERUYA_USER_TOKEN}
 
@@ -117,10 +121,37 @@ def scrape_hareruyamtg(card_name: str, language_filter: str = "EN") -> tuple:
         item_name = item.get("card_name") or ""
         if _normalize(item_name) != target:
             continue
-        if str(item.get("foil_flg", "0")) == "1":
-            continue
+
+        item_is_foil = str(item.get("foil_flg", "0")) == "1"
         prod_name = (item.get("product_name_en") or item.get("product_name") or "").lower()
-        if any(x in prod_name for x in ("foil", "promo", "prerelease", "serial", "galaxy", "retro")):
+        prod_name_has_foil = any(x in prod_name for x in ("foil", "promo", "prerelease", "serial", "galaxy", "retro"))
+
+        # Foil filter
+        if foil is True:
+            if not item_is_foil:
+                continue
+        elif foil is False or foil is None:
+            if item_is_foil or prod_name_has_foil:
+                continue
+
+        # Parse set code and collector number from product_name
+        # Format: "【EN】(316)■Showcase■《Sol Ring》[TLE]"
+        import re as _re
+        raw_name = item.get("product_name_en") or item.get("product_name") or ""
+        item_num_match = _re.search(r'\((\d+)\)', raw_name)
+        item_number = item_num_match.group(1) if item_num_match else None
+        item_set_match = _re.search(r'\[([A-Z0-9]{2,6})\]', raw_name)
+        item_set_code = item_set_match.group(1).lower() if item_set_match else None
+
+        # Set filter — prefer set code match, fall back to name match
+        if set_code:
+            if item_set_code and item_set_code != set_code.lower():
+                continue
+            elif not item_set_code and target_set_name and target_set_name not in prod_name:
+                continue
+
+        # Number filter
+        if number and item_number and item_number != number:
             continue
 
         try:
