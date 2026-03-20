@@ -16,7 +16,7 @@ from scrapers.cardhub import scrape_cardhub
 from scrapers.gamesportal import scrape_gamesportal
 from scrapers.gg import scrape_ggadelaide, scrape_ggaustralia, scrape_ggmodbury
 from scrapers.hareruya import scrape_hareruyamtg
-from scrapers.jenes import scrape_jenes
+from scrapers.jenes import scrape_jenesmtg as scrape_jenes
 from scrapers.kcg import scrape_kcg
 from scrapers.moonmtg import scrape_moonmtg
 from scrapers.mtgmate import fetch_mtgmate_price
@@ -86,7 +86,7 @@ def fetch_card(card: str, enabled: list[str], hareruya_lang: str) -> dict:
                                           None, set_code, number,
                                           True if foil else (False if etched else None))
             elif name in ("GGAdelaide", "GGModbury", "GGAustralia",
-                           "GamesPortal", "CardHub"):
+                           "GamesPortal", "CardHub", "JenesMTG"):
                 futures[name] = ex.submit(fn, card_name, set_code, number,
                                           True if foil else (False if etched else None))
             else:
