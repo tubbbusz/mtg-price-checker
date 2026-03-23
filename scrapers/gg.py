@@ -171,7 +171,7 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
                         sku_set, sku_num, sku_foil = _parse_sku(sku)
                         if set_code and sku_set and sku_set.lower() != set_code.lower():
                             continue
-                        if number and sku_num and sku_num != number:
+                        if number and sku_num and sku_num.lstrip('0') != number.lstrip('0'):
                             continue
                         is_foil = sku_foil if sku_foil is not None else "foil" in v.get("title", "").lower()
                         if foil is True and not is_foil:
@@ -186,6 +186,9 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
                             continue
                         prod_path = prod.get("url", "").split("?")[0]
                         prod_url = f"{base_url}{prod_path}" if prod_path.startswith("/") else prod_path
+                        vid = v.get("id", "")
+                        if vid:
+                            prod_url = f"{prod_url}?variant={vid}"
                         results.append((price, f"{prod_title} — {v.get('title','')}", prod_url))
             except Exception:
                 pass
