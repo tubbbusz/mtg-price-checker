@@ -121,6 +121,7 @@ def scrape_hareruyamtg(card_name: str, language_filter: str = "EN",
         item_name = item.get("card_name") or ""
         if _normalize(item_name) != target:
             continue
+        print(f"[HR] match: {item_name!r} set={item.get('product_name_en','')[-20:]!r} foil_flg={item.get('foil_flg')} stock={item.get('stock')}")
 
         item_is_foil = str(item.get("foil_flg", "0")) == "1"
         prod_name = (item.get("product_name_en") or item.get("product_name") or "").lower()

@@ -156,9 +156,17 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
 
         # Primary: data-events script tag has SKU per variant
         m = re.search(r'data-events="([^"]+)"', page_text)
+        print(f"[GG] {base_url.split('//')[1]} data-events found={m is not None} set={set_code} num={number}")
         if m:
             try:
                 events = json.loads(m.group(1).replace("&quot;", '"'))
+                variant_count = 0
+                for event in events:
+                    if len(event) < 2 or not isinstance(event[1], dict):
+                        continue
+                    variants = event[1].get("searchResult", {}).get("productVariants", [])
+                    variant_count += len(variants)
+                print(f"[GG] variants in data-events={variant_count}")
                 for event in events:
                     if len(event) < 2 or not isinstance(event[1], dict):
                         continue
