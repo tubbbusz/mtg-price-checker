@@ -183,17 +183,22 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
                 try:
                     rp = requests.get(f"{base_url}/products/{handle}.js", headers=headers, timeout=10)
                     if rp.status_code != 200:
+                        print(f"[GG] {handle} status={rp.status_code}")
                         continue
                     pdata = rp.json()
                     prod_title = pdata.get("title", handle)
-                    if _extract_base_name(prod_title) != target:
+                    prod_base = _extract_base_name(prod_title)
+                    if prod_base != target:
+                        print(f"[GG] {handle} name mismatch: {prod_base!r} != {target!r}")
                         continue
                     for v in pdata.get("variants", []):
-                        if not v.get("available", False):
-                            continue
+                        avail = v.get("available", False)
                         vtitle = v.get("title", "")
                         sku = v.get("sku", "") or ""
                         sku_set, sku_num, sku_foil = _parse_sku(sku)
+                        print(f"[GG]   variant: {vtitle!r} sku={sku!r} avail={avail} sku_set={sku_set} sku_num={sku_num}")
+                        if not avail:
+                            continue
                         if set_code and sku_set and sku_set.lower() != set_code.lower():
                             continue
                         if number and not _num_match(sku_num, number):
@@ -212,7 +217,8 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
                         vid = v.get("id")
                         vurl = f"{base_url}/products/{handle}?variant={vid}" if vid else f"{base_url}/products/{handle}"
                         results.append((price, f"{prod_title} — {vtitle}", vurl))
-                except Exception:
+                except Exception as e:
+                    print(f"[GG] {handle} error: {e}")
                     continue
             if results:
                 return min(results, key=lambda x: x[0])
