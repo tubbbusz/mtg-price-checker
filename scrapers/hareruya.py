@@ -121,7 +121,7 @@ def scrape_hareruyamtg(card_name: str, language_filter: str = "EN",
         item_name = item.get("card_name") or ""
         if _normalize(item_name) != target:
             continue
-        print(f"[HR] match: {item_name!r} set={item.get('product_name_en','')[-20:]!r} foil_flg={item.get('foil_flg')} stock={item.get('stock')}")
+        print(f"[HR] match: {item_name!r} name_en={item.get('product_name_en','')[-30:]!r} foil_flg={item.get('foil_flg')} stock={item.get('stock')} price={item.get('price')} product={item.get('product','')[-8:]!r}")
 
         item_is_foil = str(item.get("foil_flg", "0")) == "1"
         prod_name = (item.get("product_name_en") or item.get("product_name") or "").lower()
@@ -183,16 +183,16 @@ def scrape_hareruyamtg(card_name: str, language_filter: str = "EN",
                 jp_candidates.append(entry)
             else:
                 other_candidates.append(entry)
-        else:
-            if product_id:
-                page_lang = "EN" if lang_str == "2" else "JP" if lang_str == "1" else "EN"
-                fb = (product_id, label, product_url, page_lang)
-                if lang_str == "2":
-                    oos_fallback_en.append(fb)
-                elif lang_str == "1":
-                    oos_fallback_jp.append(fb)
-                else:
-                    oos_fallback_other.append(fb)
+        elif product_id:
+            # OOS in API — check product page for any available conditions
+            page_lang = "EN" if lang_str == "2" else "JP" if lang_str == "1" else "EN"
+            fb = (product_id, label, product_url, page_lang)
+            if lang_str == "2":
+                oos_fallback_en.append(fb)
+            elif lang_str == "1":
+                oos_fallback_jp.append(fb)
+            else:
+                oos_fallback_other.append(fb)
 
     def resolve(nm_list, oos_list):
         if nm_list:
