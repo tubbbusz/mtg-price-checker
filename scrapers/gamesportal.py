@@ -70,14 +70,22 @@ def _scrape_shopify_variants(card_name, base_url, set_code=None, number=None, fo
                 href = link.get("href", "").split("?")[0]
                 prod_url = f"{base_url}{href}" if href.startswith("/") else href
 
-            # Process variants
+            # Process variants — prefer NM but accept best available condition
+            COND_RANK = {"near mint": 0, "lightly played": 1, "moderately played": 2,
+                         "heavily played": 3, "damaged": 4}
+            best_v = None; best_rank = 99; best_price = None
             for v in variants:
                 if not v.get("available", False):
                     continue
                 vtitle = v.get("title", "")
-                if "near mint" not in vtitle.lower():
-                    continue
-                variant_is_foil = "foil" in vtitle.lower()
+                vtitle_lower = vtitle.lower()
+                variant_is_foil = "foil" in vtitle_lower
+                # Determine condition rank (strip foil suffix for matching)
+                cond_key = re.sub(r"\s*foil\s*$", "", vtitle_lower).strip()
+                rank = COND_RANK.get(cond_key, 99)
+                if rank == 99:
+                    continue  # unknown condition
+                variant_is_foil = "foil" in vtitle_lower
                 if foil is True and not variant_is_foil:
                     continue
                 if foil is False and variant_is_foil:
@@ -88,9 +96,11 @@ def _scrape_shopify_variants(card_name, base_url, set_code=None, number=None, fo
                     continue
                 if price <= 0:
                     continue
-                vid = v.get("id")
-                vurl = f"{prod_url}?variant={vid}" if vid else prod_url
-                results.append((price, f"{prod_title} — {vtitle}", vurl))
+                if rank < best_rank or (rank == best_rank and (best_price is None or price < best_price)):
+                    best_rank = rank; best_price = price
+                    best_v = (price, f"{prod_title} — {vtitle}", f"{prod_url}?variant={v.get('id')}" if v.get('id') else prod_url)
+            if best_v:
+                results.append(best_v)
 
         if not results:
             return 0.0, "Out of stock", ""
