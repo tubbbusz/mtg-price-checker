@@ -45,8 +45,9 @@ def _scrape_shopify_variants(card_name, base_url, set_code=None, number=None, fo
             if _extract_base_name(prod_title) != target:
                 continue
 
-            # Product is foil if "foil" tag present
-            prod_is_foil_type = "foil" in tags
+            # Product is foil if "foil" tag present (CardHub/GamesPortal store 
+            # foil as a product-level tag, not per-variant)
+            prod_is_foil = "foil" in tags
 
             # Set filter — match tag against full set name
             if target_set_name:
@@ -79,13 +80,13 @@ def _scrape_shopify_variants(card_name, base_url, set_code=None, number=None, fo
                     continue
                 vtitle = v.get("title", "")
                 vtitle_lower = vtitle.lower()
-                variant_is_foil = "foil" in vtitle_lower
+                # Foil: use product-level tag (CardHub/GP) OR variant title (GGAus style)
+                variant_is_foil = "foil" in vtitle_lower  # e.g. "Near Mint - Foil"
                 # Determine condition rank (strip foil suffix for matching)
-                cond_key = re.sub(r"\s*foil\s*$", "", vtitle_lower).strip()
+                cond_key = re.sub(r"\s*-?\s*foil\s*$", "", vtitle_lower).strip()
                 rank = COND_RANK.get(cond_key, 99)
                 if rank == 99:
                     continue  # unknown condition
-                variant_is_foil = "foil" in vtitle_lower
                 if foil is True and not variant_is_foil:
                     continue
                 if foil is False and variant_is_foil:

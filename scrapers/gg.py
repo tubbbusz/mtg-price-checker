@@ -159,6 +159,7 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
             except Exception:
                 pass
 
+        print(f"[GG] {base_url.split('//')[1]} data-events results={len(results)} set={set_code} num={number}")
         if results:
             return min(results, key=lambda x: x[0])
 
@@ -176,6 +177,7 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
                     handles_seen.append(handle)
 
         # For set/number filtering, fetch product.js per handle
+        print(f"[GG] handles found={len(handles_seen)} filtering by set={set_code} num={number}")
         if handles_seen and (set_code or number or foil is not None):
             for handle in handles_seen[:8]:
                 try:
