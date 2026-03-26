@@ -402,6 +402,205 @@
   input[type="checkbox"] { cursor: pointer; }
   label { cursor: pointer; }
   a { color: #0000ff; }
+
+  /* ── Dark Mode ─────────────────────────────────────────── */
+  body.dark {
+    background-color: #1a1a2e;
+    color: #c8c8d8;
+  }
+  body.dark #titlebar {
+    background: #0d0d1a;
+    color: #a0a0ff;
+    border-bottom: 2px solid #3030a0;
+  }
+  body.dark #ck-badge {
+    background: #0d0d1a;
+    color: #ffff44;
+    border-color: #ffff44;
+  }
+  body.dark #ck-badge.ready { color: #44ff44; border-color: #44ff44; }
+  body.dark #menubar {
+    background: #252540;
+    border-bottom-color: #404060;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a30;
+  }
+  body.dark .menu-item { color: #c8c8d8; }
+  body.dark .menu-item:hover,
+  body.dark .menu-item.open {
+    background: #3a3a7a;
+    color: #ffffff;
+  }
+  body.dark .menu-dropdown {
+    background: #252540;
+    color: #c8c8d8;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+    box-shadow: 2px 2px 0 #000000;
+  }
+  body.dark .menu-entry { color: #c8c8d8; }
+  body.dark .menu-entry:hover { background: #3a3a7a; color: #ffffff; }
+  body.dark .menu-entry.disabled { color: #505070; }
+  body.dark .menu-entry.disabled:hover { background: transparent; color: #505070; }
+  body.dark .menu-separator {
+    border-top-color: #404060;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark .groupbox {
+    background: #252540;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark .groupbox-title {
+    background: #1a1a4a;
+    color: #a0a0ff;
+  }
+  body.dark input[type="text"],
+  body.dark textarea,
+  body.dark select {
+    background: #12121f;
+    color: #c8c8d8;
+    border-top-color: #1a1a2e;
+    border-left-color: #1a1a2e;
+    border-right-color: #404060;
+    border-bottom-color: #404060;
+  }
+  body.dark .btn {
+    background: #2a2a50;
+    color: #c8c8d8;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark .btn:active {
+    border-top-color: #1a1a2e;
+    border-left-color: #1a1a2e;
+    border-right-color: #404060;
+    border-bottom-color: #404060;
+  }
+  body.dark .btn:disabled { color: #404060; }
+  body.dark .btn-primary { background: #1a1a6a; color: #a0a0ff; font-weight: bold; }
+  body.dark .btn-primary:active { background: #0d0d4a; }
+  body.dark .btn-danger { background: #4a0000; color: #ff8080; }
+  body.dark .raised {
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark .sunken {
+    border-top-color: #1a1a2e;
+    border-left-color: #1a1a2e;
+    border-right-color: #404060;
+    border-bottom-color: #404060;
+  }
+  body.dark .setting-row {
+    border-bottom-color: #404060;
+    color: #c8c8d8;
+  }
+  body.dark .source-toggle:hover { background: #3a3a7a; color: #ffffff; }
+  body.dark .toggle-all-link { color: #7070ff; }
+  body.dark #missing-list {
+    background: #12121f;
+    border-top-color: #1a1a2e;
+    border-left-color: #1a1a2e;
+    border-right-color: #404060;
+    border-bottom-color: #404060;
+  }
+  body.dark #missing-list li { border-bottom-color: #252540; color: #ff8080; }
+  body.dark #statusbar {
+    background: #252540;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark #status-text { color: #a0a0c0; }
+  body.dark progress {
+    background: #12121f;
+    border-top-color: #1a1a2e;
+    border-left-color: #1a1a2e;
+    border-right-color: #404060;
+    border-bottom-color: #404060;
+  }
+  body.dark progress::-webkit-progress-bar { background: #12121f; }
+  body.dark progress::-webkit-progress-value { background: #3a3a9a; }
+  body.dark #total-label {
+    background: #252540;
+    color: #a0a0ff;
+    border-top-color: #1a1a2e;
+    border-left-color: #1a1a2e;
+    border-right-color: #404060;
+    border-bottom-color: #404060;
+  }
+  body.dark #table-wrap {
+    background: #12121f;
+    border-top-color: #1a1a2e;
+    border-left-color: #1a1a2e;
+    border-right-color: #404060;
+    border-bottom-color: #404060;
+  }
+  body.dark thead th {
+    background: #1a1a4a;
+    color: #a0a0ff;
+    border-right-color: #2a2a6a;
+  }
+  body.dark thead th:hover { background: #252560; }
+  body.dark tbody tr { border-bottom-color: #252540; }
+  body.dark tbody tr:nth-child(even) { background: #1a1a30; }
+  body.dark tbody tr:nth-child(odd) { background: #12121f; }
+  body.dark tbody tr:hover { background: #2a2a6a !important; color: #ffffff !important; }
+  body.dark tbody tr.selected { background: #2a2a6a !important; color: #ffffff !important; outline-color: #a0a0ff; }
+  body.dark td.card-name { color: #8080ff; }
+  body.dark td.cheapest { color: #44cc44; }
+  body.dark #ctx-menu {
+    background: #252540;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+    box-shadow: 2px 2px 0 #000000;
+  }
+  body.dark #ctx-menu li { color: #c8c8d8; }
+  body.dark #ctx-menu li:hover { background: #3a3a7a; color: #ffffff; }
+  body.dark #ctx-menu li.divider {
+    border-top-color: #404060;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark #ctx-menu li.divider:hover { background: transparent; color: #c8c8d8; }
+  body.dark #toast {
+    background: #1a1a3a;
+    color: #c8c8d8;
+    border-color: #404060;
+    box-shadow: 2px 2px 0 #000000;
+  }
+  body.dark #import-opts-panel {
+    background: #252540 !important;
+    border-color: #404060 !important;
+  }
+  body.dark ::-webkit-scrollbar-track { background: #1a1a2e; }
+  body.dark ::-webkit-scrollbar-thumb {
+    background: #2a2a50;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark ::-webkit-scrollbar-button {
+    background: #2a2a50;
+    border-top-color: #404060;
+    border-left-color: #404060;
+    border-right-color: #1a1a2e;
+    border-bottom-color: #1a1a2e;
+  }
+  body.dark ::-webkit-scrollbar-corner { background: #1a1a2e; }
+  body.dark a { color: #7070ff; }
 </style>
 </head>
 <body>
@@ -453,6 +652,8 @@
       <div class="menu-entry zoom-entry" data-zoom="200">200%</div>
       <div class="menu-separator"></div>
       <div class="menu-entry" id="menu-toggle-sidebar">Toggle Sidebar</div>
+      <div class="menu-separator"></div>
+      <div class="menu-entry" id="menu-toggle-dark">Dark Mode</div>
     </div>
   </div>
 
@@ -1114,6 +1315,21 @@ document.querySelectorAll('.zoom-entry').forEach(el => {
   });
 });
 
+// ── Toggle dark mode ───────────────────────────────────────
+let darkMode = false;
+function setDarkMode(on) {
+  darkMode = on;
+  document.body.classList.toggle('dark', on);
+  const entry = document.getElementById('menu-toggle-dark');
+  if (entry) entry.classList.toggle('checked', on);
+}
+
+document.getElementById('menu-toggle-dark').addEventListener('click', () => {
+  setDarkMode(!darkMode);
+  savePrefs();
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('open'));
+});
+
 // ── Toggle sidebar ─────────────────────────────────────────
 document.getElementById('menu-toggle-sidebar').addEventListener('click', () => {
   const sidebar = document.getElementById('sidebar');
@@ -1165,6 +1381,7 @@ function loadPrefs(applySourcesToo) {
   try {
     const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
     if (p.zoom) setZoom(p.zoom);
+    if (p.darkMode) setDarkMode(p.darkMode);
     if (p.harLang) document.getElementById('hareruya-lang').value = p.harLang;
     if (p.importSet  !== undefined) document.getElementById('import-set').checked  = p.importSet;
     if (p.importNum  !== undefined) document.getElementById('import-num').checked  = p.importNum;
@@ -1184,6 +1401,7 @@ function savePrefs() {
   try {
     localStorage.setItem(PREFS_KEY, JSON.stringify({
       zoom: currentZoom,
+      darkMode: darkMode,
       harLang: document.getElementById('hareruya-lang').value,
       importSet:  document.getElementById('import-set').checked,
       importNum:  document.getElementById('import-num').checked,
