@@ -110,8 +110,7 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
     target = _extract_base_name(card_name)
     target_set_name = get_set_name(set_code).lower() if set_code else None
     query = quote_plus(card_name)
-    # Use original working search URL format
-    search_url = f"{base_url}/search?q={quote_plus(card_name + ' product_type:\"mtg\"')}"
+    search_url = f"{base_url}/search?q={query}"
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
@@ -222,27 +221,56 @@ def scrape_gg(card_name, base_url, set_code=None, number=None, foil=None):
                     continue
             if results:
                 return min(results, key=lambda x: x[0])
-            return 0.0, "Out of stock", ""
 
-        # No set/number/foil filter — use addNow.single prices
+        # Fallback — use addNow.single prices from search HTML
+        seen_vids = set()
         for div in soup.select("div.addNow.single"):
             onclick = div.get("onclick", "")
-            match = re.search(r"addToCart\([^,]+,'([^']+)'", onclick)
-            full_title = match.group(1).strip() if match else "N/A"
+            # addToCart('variantId','Title','qty',1)
+            oc_match = re.search(r"addToCart\('([^']+)','([^']+)'", onclick)
+            if not oc_match:
+                continue
+            vid = oc_match.group(1)
+            if vid in seen_vids:
+                continue
+            seen_vids.add(vid)
+            full_title = oc_match.group(2).strip()
             price_tag = div.find("p")
             price_text = price_tag.get_text(strip=True) if price_tag else ""
             pm = re.search(r"\$([\d.,]+)", price_text)
             price = float(pm.group(1).replace(",", "")) if pm else 0.0
-            if _extract_base_name(full_title) != target:
+            if price <= 0:
                 continue
-            title_set = _get_set_from_title(full_title).lower()
-            if target_set_name and target_set_name not in title_set and title_set not in target_set_name:
+            # Strip trailing condition suffix: "- NM", "- Foil - NM", etc.
+            clean_title = re.sub(r"(\s*-\s*(NM|LP|MP|HP|DMG|damaged|heavily played|moderately played|lightly played|near mint))+\s*$", "", full_title, flags=re.I)
+            # Detect condition for ranking (prefer NM over cheaper LP)
+            cond_match = re.search(r"\b(near mint|lightly played|moderately played|heavily played|damaged|NM|LP|MP|HP|DMG)\b", price_text, re.I)
+            cond_str = cond_match.group(1).lower() if cond_match else "near mint"
+            cond_map = {"nm": "near mint", "lp": "lightly played", "mp": "moderately played", "hp": "heavily played", "dmg": "damaged"}
+            cond_str = cond_map.get(cond_str, cond_str)
+            cond_rank = CONDITION_RANK.get(cond_str, 99)
+            # Name check — strip collector number before parens: "Sol Ring 871 (Set)" -> "Sol Ring"
+            name_part = re.sub(r"\s+\d[\d/]*\s+(?=\()", " ", clean_title)
+            name_part = re.sub(r"\s+\d[\d/]*\s*$", "", name_part)
+            if _extract_base_name(name_part) != target:
                 continue
-            results.append((price, full_title, search_url))
+            # Set filter — title format: "Card Name (Set Name)" or "Card Name 42/63 (Set Name)"
+            if target_set_name:
+                paren_match = re.search(r"\(([^)]+)\)\s*$", clean_title)
+                title_set = paren_match.group(1).lower() if paren_match else ""
+                if title_set and target_set_name not in title_set and title_set not in target_set_name:
+                    continue
+            is_foil = "foil" in full_title.lower()
+            if foil is True and not is_foil:
+                continue
+            if foil is False and is_foil:
+                continue
+            results.append((cond_rank, price, clean_title, f"{search_url}&variant={vid}"))
 
         if not results:
             return 0.0, "Out of stock", ""
-        return min(results, key=lambda x: x[0])
+        best = min(results, key=lambda x: (x[0], x[1]))
+        return best[1], best[2], best[3]
     except Exception:
         return 0.0, "Error", ""
 
